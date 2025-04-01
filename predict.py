@@ -223,7 +223,7 @@ if __name__ == "__main__":
     
     # Test prediction
     test_features = {
-        'pickup_hour': 18,
+        'pickup_hour': 18, 
         'day_of_week': 3,
         'zone_id': 42,
         'congestion_surcharge': 1.25,

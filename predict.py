@@ -8,17 +8,45 @@ import os
 from typing import Dict, Optional
 from clearml import Task, Dataset, OutputModel
 import tempfile
+from datetime import datetime
 
 # Global variable to store the loaded model
 _model: Optional[xgb.XGBRegressor] = None
 
-def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -> None:
+def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Preprocess the taxi data to create features for demand prediction
+    
+    Args:
+        df: Raw taxi trip data DataFrame
+        
+    Returns:
+        Processed DataFrame with features for demand prediction
+    """
+    # Extract time-based features
+    df['pickup_hour'] = df['tpep_pickup_datetime'].dt.hour
+    df['day_of_week'] = df['tpep_pickup_datetime'].dt.dayofweek
+    
+    # Use PULocationID as zone_id
+    df['zone_id'] = df['PULocationID']
+    
+    # Calculate demand (number of pickups per hour per zone)
+    demand_df = df.groupby(['pickup_hour', 'day_of_week', 'zone_id']).size().reset_index(name='demand')
+    
+    # Add congestion level based on congestion surcharge
+    congestion_df = df.groupby(['pickup_hour', 'day_of_week', 'zone_id'])['congestion_surcharge'].mean().reset_index()
+    demand_df = demand_df.merge(congestion_df, on=['pickup_hour', 'day_of_week', 'zone_id'], how='left')
+    demand_df['congestion_level'] = demand_df['congestion_surcharge'] / 2.5  # Normalize to 0-1
+    
+    return demand_df
+
+def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> None:
     """
     Train an XGBoost model on the provided data and save it to disk.
     Also logs experiment to ClearML.
     
     Args:
-        data: DataFrame containing features and target
+        data_path: Path to the parquet file containing taxi trip data
         model_path: Path where the model should be saved
     """
     # Initialize ClearML task
@@ -28,8 +56,20 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
         task_type='training'
     )
     
+    # Load and preprocess data
+    print("Loading data...")
+    raw_data = pd.read_parquet(data_path)
+    data = preprocess_data(raw_data)
+    
     # Log dataset info
-    task.connect({"dataset_size": len(data)})
+    task.connect({
+        "dataset_size": len(data),
+        "num_zones": data['zone_id'].nunique(),
+        "date_range": {
+            "start": raw_data['tpep_pickup_datetime'].min().strftime('%Y-%m-%d'),
+            "end": raw_data['tpep_pickup_datetime'].max().strftime('%Y-%m-%d')
+        }
+    })
     
     # Separate features and target
     X = data.drop('demand', axis=1)
@@ -40,12 +80,15 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
         X, y, test_size=0.2, random_state=42
     )
     
-    # Model parameters
+    # Model parameters optimized for larger dataset
     model_params = {
         'objective': 'reg:squarederror',
-        'n_estimators': 100,
-        'learning_rate': 0.1,
-        'max_depth': 6,
+        'n_estimators': 200,  # Increased for better convergence
+        'learning_rate': 0.05,  # Reduced for better generalization
+        'max_depth': 8,  # Increased for more complex patterns
+        'min_child_weight': 3,  # Added to prevent overfitting
+        'subsample': 0.8,  # Added for better generalization
+        'colsample_bytree': 0.8,  # Added for better generalization
         'random_state': 42,
         'eval_metric': ['rmse']
     }
@@ -56,11 +99,13 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
     # Initialize and train model
     model = xgb.XGBRegressor(**model_params)
     
-    # Train model
+    print("Training model...")
+    # Train model with early stopping
     model.fit(
         X_train, y_train,
         eval_set=[(X_test, y_test)],
-        verbose=False
+        early_stopping_rounds=20,  # Added early stopping
+        verbose=True
     )
     
     # Evaluate model
@@ -72,6 +117,13 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
     logger = task.get_logger()
     logger.report_scalar("Metrics", "MSE", iteration=0, value=mse)
     logger.report_scalar("Metrics", "RMSE", iteration=0, value=rmse)
+    
+    # Log feature importance
+    feature_importance = pd.DataFrame({
+        'feature': X.columns,
+        'importance': model.feature_importances_
+    })
+    task.connect({"feature_importance": feature_importance.to_dict('records')})
     
     # Log training progress
     validation_scores = model.evals_result()
@@ -141,7 +193,7 @@ def predict_demand(input_features: Dict) -> float:
     # Ensure all required features are present
     required_features = [
         'pickup_hour', 'day_of_week', 'zone_id', 
-        'temperature', 'rain', 'congestion_level'
+        'congestion_surcharge', 'congestion_level'
     ]
     missing_features = [f for f in required_features if f not in input_features]
     if missing_features:
@@ -152,11 +204,11 @@ def predict_demand(input_features: Dict) -> float:
     if extra_features:
         print(f"Extra features provided: {extra_features}. These features will not be used.")
     
-    # Use only required features from input
+    # Use only required features from input in the correct order
     input_features = {k: input_features[k] for k in required_features}
     
-    # Convert input to DataFrame row
-    input_df = pd.DataFrame([input_features])
+    # Convert input to DataFrame row with ordered columns
+    input_df = pd.DataFrame([input_features], columns=required_features)
     
     # Load model and make prediction
     model = load_model()
@@ -165,27 +217,16 @@ def predict_demand(input_features: Dict) -> float:
     return float(prediction)
 
 if __name__ == "__main__":
-    # Create dummy dataset for testing
-    df_dummy = pd.DataFrame({
-        "pickup_hour": np.random.randint(0, 24, 100),
-        "day_of_week": np.random.randint(0, 7, 100),
-        "zone_id": np.random.randint(1, 266, 100),
-        "temperature": np.random.uniform(30, 100, 100),
-        "rain": np.random.uniform(0, 1, 100),
-        "congestion_level": np.random.uniform(0, 1, 100),
-        "demand": np.random.randint(0, 150, 100)
-    })
-    
-    # Train and save model
-    train_and_save_model(df_dummy)
+    # Train model on the full dataset
+    data_path = 'data/yellow_tripdata_2025-01.parquet'
+    train_and_save_model(data_path)
     
     # Test prediction
     test_features = {
-        'pickup_hour': 14,
+        'pickup_hour': 18,
         'day_of_week': 3,
         'zone_id': 42,
-        'temperature': 75.5,
-        'rain': 0.2,
+        'congestion_surcharge': 1.25,
         'congestion_level': 0.5
     }
     

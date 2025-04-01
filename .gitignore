@@ -1,9 +1,14 @@
+# Data files
+*.parquet
+data/*.parquet
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -22,7 +27,6 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
 
 # IDE
@@ -31,10 +35,13 @@ ENV/
 *.swp
 *.swo
 
-# Project specific
-model.joblib
+# Model files
+*.joblib
 *.pkl
 *.h5
+
+# Project specific
+model.joblib
 *.pth
 *.onnx
 *.pb

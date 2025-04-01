@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error
 import joblib
 import os
 from typing import Dict, Optional
-from clearml import Task, Dataset, Model
+from clearml import Task, Dataset, OutputModel
 import tempfile
 
 # Global variable to store the loaded model
@@ -25,11 +25,11 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
     task = Task.init(
         project_name='TaxiDemandPrediction',
         task_name='XGBoostTraining',
-        task_type=Task.TaskTypes.TRAINING
+        task_type='training'
     )
     
     # Log dataset info
-    task.connect(data)
+    task.connect({"dataset_size": len(data)})
     
     # Separate features and target
     X = data.drop('demand', axis=1)
@@ -40,23 +40,26 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
         X, y, test_size=0.2, random_state=42
     )
     
-    # Log model parameters
+    # Model parameters
     model_params = {
         'objective': 'reg:squarederror',
         'n_estimators': 100,
         'learning_rate': 0.1,
         'max_depth': 6,
-        'random_state': 42
+        'random_state': 42,
+        'eval_metric': ['rmse']
     }
-    task.connect(model_params)
+    
+    # Log parameters
+    task.connect({"model_params": model_params})
     
     # Initialize and train model
     model = xgb.XGBRegressor(**model_params)
     
+    # Train model
     model.fit(
         X_train, y_train,
         eval_set=[(X_test, y_test)],
-        early_stopping_rounds=10,
         verbose=False
     )
     
@@ -65,9 +68,15 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
     mse = mean_squared_error(y_test, y_pred)
     rmse = np.sqrt(mse)
     
-    # Log metrics
-    task.get_logger().report_scalar('MSE', 'Test', mse)
-    task.get_logger().report_scalar('RMSE', 'Test', rmse)
+    # Log final metrics
+    logger = task.get_logger()
+    logger.report_scalar("Metrics", "MSE", iteration=0, value=mse)
+    logger.report_scalar("Metrics", "RMSE", iteration=0, value=rmse)
+    
+    # Log training progress
+    validation_scores = model.evals_result()
+    for i, rmse_value in enumerate(validation_scores['validation_0']['rmse']):
+        logger.report_scalar("Training Progress", "RMSE", iteration=i, value=rmse_value)
     
     print(f"Model MSE: {mse:.2f}")
     print(f"Model RMSE: {rmse:.2f}")
@@ -77,16 +86,13 @@ def train_and_save_model(data: pd.DataFrame, model_path: str = 'model.joblib') -
     print(f"Model saved locally to {model_path}")
     
     # Register model in ClearML
-    with tempfile.NamedTemporaryFile(suffix='.joblib', delete=False) as tmp:
-        joblib.dump(model, tmp.name)
-        model = Model(
-            task=task,
-            name='TaxiDemandXGBoost',
-            framework='XGBoost',
-            description='Taxi demand prediction model using XGBoost'
-        )
-        model.upload(tmp.name)
-        os.unlink(tmp.name)
+    output_model = OutputModel(
+        task=task,
+        name='TaxiDemandXGBoost',
+        framework='xgboost',
+        label_enumeration={}
+    )
+    output_model.update_weights(weights_filename=model_path)
     
     print("Model registered in ClearML")
     
@@ -110,12 +116,10 @@ def load_model(model_path: str = 'model.joblib') -> xgb.XGBRegressor:
         if not os.path.exists(model_path):
             print("Model not found locally, attempting to download from ClearML...")
             try:
-                # Initialize ClearML task
                 task = Task.get_task(project_name='TaxiDemandPrediction')
-                # Get the latest model
-                model = Model.get_model(project_name='TaxiDemandPrediction', name='TaxiDemandXGBoost')
-                # Download the model
-                model_path = model.download()
+                model_id = task.models['output'][-1].id
+                output_model = OutputModel(model_id=model_id)
+                model_path = output_model.get_weights()
                 print(f"Model downloaded from ClearML to {model_path}")
             except Exception as e:
                 raise FileNotFoundError(f"Could not find model locally or in ClearML: {str(e)}")
@@ -134,9 +138,6 @@ def predict_demand(input_features: Dict) -> float:
     Returns:
         Predicted demand as a float
     """
-    # Convert input to DataFrame row
-    input_df = pd.DataFrame([input_features])
-    
     # Ensure all required features are present
     required_features = [
         'pickup_hour', 'day_of_week', 'zone_id', 
@@ -145,6 +146,17 @@ def predict_demand(input_features: Dict) -> float:
     missing_features = [f for f in required_features if f not in input_features]
     if missing_features:
         raise ValueError(f"Missing required features: {missing_features}")
+    
+    # Identify and notify about extra features
+    extra_features = [f for f in input_features if f not in required_features]
+    if extra_features:
+        print(f"Extra features provided: {extra_features}. These features will not be used.")
+    
+    # Use only required features from input
+    input_features = {k: input_features[k] for k in required_features}
+    
+    # Convert input to DataFrame row
+    input_df = pd.DataFrame([input_features])
     
     # Load model and make prediction
     model = load_model()

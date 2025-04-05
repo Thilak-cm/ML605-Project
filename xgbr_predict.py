@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import TimeSeriesSplit
+import shap
 
 # Global variable to store the loaded model
 _model: Optional[xgb.XGBRegressor] = None
@@ -67,7 +68,10 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_evaluation_plots(y_true: np.ndarray, y_pred: np.ndarray, 
                           feature_importance: pd.DataFrame, 
-                          task: Task) -> None:
+                          task: Task,
+                          model: xgb.XGBRegressor = None,
+                          X_test: pd.DataFrame = None,
+                          dates: pd.DatetimeIndex = None) -> None:
     """
     Create and log evaluation plots to ClearML
     
@@ -76,11 +80,16 @@ def create_evaluation_plots(y_true: np.ndarray, y_pred: np.ndarray,
         y_pred: Predicted values
         feature_importance: DataFrame with feature importance
         task: ClearML task object
+        model: Trained XGBoost model (optional)
+        X_test: Test features DataFrame (optional)
+        dates: DatetimeIndex for time-based analysis (optional)
     """
     logger = task.get_logger()
     
+    # 1. Basic Evaluation Plots
+    
     # Create residual plot
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     residuals = y_true - y_pred
     plt.scatter(y_pred, residuals, alpha=0.5)
     plt.axhline(y=0, color='r', linestyle='--')
@@ -89,14 +98,14 @@ def create_evaluation_plots(y_true: np.ndarray, y_pred: np.ndarray,
     plt.title('Residual Plot')
     logger.report_matplotlib_figure(
         title="Residual Plot",
-        series="Evaluation",
+        series="Basic Evaluation",
         figure=plt.gcf(),
         iteration=0
     )
     plt.close()
     
     # Create actual vs predicted plot
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 6))
     plt.scatter(y_true, y_pred, alpha=0.5)
     plt.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--')
     plt.xlabel('Actual Values')
@@ -104,20 +113,206 @@ def create_evaluation_plots(y_true: np.ndarray, y_pred: np.ndarray,
     plt.title('Actual vs Predicted Values')
     logger.report_matplotlib_figure(
         title="Actual vs Predicted",
-        series="Evaluation",
+        series="Basic Evaluation",
         figure=plt.gcf(),
         iteration=0
     )
     plt.close()
     
-    # Create feature importance plot
+    # 2. Feature Analysis
+    
+    # Create feature importance plot with improved styling
     plt.figure(figsize=(12, 8))
-    sns.barplot(x='importance', y='feature', 
-                data=feature_importance.sort_values('importance', ascending=False).head(20))
+    importance_plot = sns.barplot(
+        x='importance',
+        y='feature',
+        data=feature_importance.sort_values('importance', ascending=False).head(20),
+        palette='viridis'
+    )
     plt.title('Top 20 Feature Importance')
+    plt.xlabel('Importance Score')
+    plt.ylabel('Features')
+    
+    # Add value labels to the bars
+    for i in importance_plot.containers:
+        importance_plot.bar_label(i, fmt='%.3f')
+    
     logger.report_matplotlib_figure(
         title="Feature Importance",
-        series="Evaluation",
+        series="Feature Analysis",
+        figure=plt.gcf(),
+        iteration=0
+    )
+    plt.close()
+    
+    # 3. Error Analysis
+    
+    # Error distribution plot
+    plt.figure(figsize=(12, 6))
+    sns.histplot(residuals, kde=True, bins=50)
+    plt.axvline(x=0, color='r', linestyle='--')
+    plt.xlabel('Prediction Error')
+    plt.ylabel('Count')
+    plt.title('Error Distribution')
+    logger.report_matplotlib_figure(
+        title="Error Distribution",
+        series="Error Analysis",
+        figure=plt.gcf(),
+        iteration=0
+    )
+    plt.close()
+    
+    # Q-Q plot for residuals
+    plt.figure(figsize=(10, 6))
+    from scipy import stats
+    stats.probplot(residuals, dist="norm", plot=plt)
+    plt.title("Q-Q Plot of Residuals")
+    logger.report_matplotlib_figure(
+        title="Q-Q Plot",
+        series="Error Analysis",
+        figure=plt.gcf(),
+        iteration=0
+    )
+    plt.close()
+    
+    if dates is not None:
+        # 4. Time-based Analysis
+        
+        # Error by hour of day
+        hourly_errors = pd.DataFrame({
+            'hour': pd.DatetimeIndex(dates).hour,
+            'abs_error': np.abs(residuals),
+            'error': residuals
+        })
+        
+        # Mean absolute error by hour
+        plt.figure(figsize=(12, 6))
+        sns.boxplot(x='hour', y='abs_error', data=hourly_errors)
+        plt.xlabel('Hour of Day')
+        plt.ylabel('Absolute Error')
+        plt.title('Error Distribution by Hour of Day')
+        logger.report_matplotlib_figure(
+            title="Hourly Error Distribution",
+            series="Time Analysis",
+            figure=plt.gcf(),
+            iteration=0
+        )
+        plt.close()
+        
+        # Error patterns over time
+        plt.figure(figsize=(15, 6))
+        plt.scatter(dates, residuals, alpha=0.5, s=10)
+        plt.axhline(y=0, color='r', linestyle='--')
+        plt.xlabel('Date')
+        plt.ylabel('Error')
+        plt.title('Error Patterns Over Time')
+        logger.report_matplotlib_figure(
+            title="Temporal Error Patterns",
+            series="Time Analysis",
+            figure=plt.gcf(),
+            iteration=0
+        )
+        plt.close()
+        
+        # Weekly patterns
+        weekly_errors = pd.DataFrame({
+            'day': pd.DatetimeIndex(dates).dayofweek,
+            'abs_error': np.abs(residuals)
+        })
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(x='day', y='abs_error', data=weekly_errors)
+        plt.xlabel('Day of Week (0=Monday)')
+        plt.ylabel('Absolute Error')
+        plt.title('Error Distribution by Day of Week')
+        logger.report_matplotlib_figure(
+            title="Weekly Error Patterns",
+            series="Time Analysis",
+            figure=plt.gcf(),
+            iteration=0
+        )
+        plt.close()
+    
+    if model is not None and X_test is not None:
+        # 5. SHAP Analysis
+        try:
+            # Calculate SHAP values
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_test)
+            
+            # SHAP summary plot
+            plt.figure(figsize=(12, 8))
+            shap.summary_plot(shap_values, X_test, show=False)
+            plt.title('SHAP Feature Impact Overview')
+            logger.report_matplotlib_figure(
+                title="SHAP Summary",
+                series="SHAP Analysis",
+                figure=plt.gcf(),
+                iteration=0
+            )
+            plt.close()
+            
+            # SHAP dependence plots for top 3 features
+            top_features = feature_importance.nlargest(3, 'importance')['feature'].values
+            for feature in top_features:
+                plt.figure(figsize=(10, 6))
+                shap.dependence_plot(
+                    feature, shap_values, X_test,
+                    show=False
+                )
+                plt.title(f'SHAP Dependence Plot: {feature}')
+                logger.report_matplotlib_figure(
+                    title=f"SHAP Dependence - {feature}",
+                    series="SHAP Analysis",
+                    figure=plt.gcf(),
+                    iteration=0
+                )
+                plt.close()
+            
+            # SHAP Interaction plots for top feature
+            top_feature = feature_importance.nlargest(1, 'importance')['feature'].values[0]
+            plt.figure(figsize=(10, 6))
+            shap.dependence_plot(
+                top_feature, shap_values, X_test,
+                interaction_index='auto',
+                show=False
+            )
+            plt.title(f'SHAP Interaction Plot: {top_feature}')
+            logger.report_matplotlib_figure(
+                title=f"SHAP Interaction - {top_feature}",
+                series="SHAP Analysis",
+                figure=plt.gcf(),
+                iteration=0
+            )
+            plt.close()
+            
+        except Exception as e:
+            print(f"Could not create SHAP plots: {str(e)}")
+    
+    # 6. Prediction Range Analysis
+    
+    # Error vs Prediction Magnitude
+    plt.figure(figsize=(12, 6))
+    plt.scatter(y_pred, np.abs(residuals), alpha=0.5)
+    plt.xlabel('Predicted Value')
+    plt.ylabel('Absolute Error')
+    plt.title('Error Magnitude vs Prediction Value')
+    logger.report_matplotlib_figure(
+        title="Error vs Prediction",
+        series="Prediction Analysis",
+        figure=plt.gcf(),
+        iteration=0
+    )
+    plt.close()
+    
+    # Prediction vs Actual with confidence bands
+    plt.figure(figsize=(12, 6))
+    sns.regplot(x=y_true, y=y_pred, scatter_kws={'alpha':0.5})
+    plt.xlabel('Actual Values')
+    plt.ylabel('Predicted Values')
+    plt.title('Prediction vs Actual with Confidence Bands')
+    logger.report_matplotlib_figure(
+        title="Regression Plot",
+        series="Prediction Analysis",
         figure=plt.gcf(),
         iteration=0
     )
@@ -125,52 +320,56 @@ def create_evaluation_plots(y_true: np.ndarray, y_pred: np.ndarray,
 
 def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> None:
     """
-    Train an XGBoost model on the provided data and save it to disk.
-    Also logs experiment to ClearML.
+    Train XGBoost model and save it along with preprocessing objects.
     
     Args:
-        data_path: Path to the merged features CSV file
-        model_path: Path where the model should be saved
+        data_path: Path to the training data CSV
+        model_path: Path to save the model
     """
     # Initialize ClearML task
     task = Task.init(
         project_name='TaxiDemandPrediction',
-        task_name='XGBoostTraining_Improved',
+        task_name='XGBoostTraining_Normalized',
         task_type='training'
     )
+    logger = task.get_logger()
     
-    # Load and preprocess data
     print("Loading data...")
     df = pd.read_csv(data_path)
+    
+    # Convert datetime column
+    if 'hour' in df.columns:
+        df['hour'] = pd.to_datetime(df['hour'])
+    
+    # Preprocess data
     df = preprocess_data(df)
     
-    # Log dataset info
-    task.connect({
-        "dataset_size": len(df),
-        "date_range": {
-            "start": df.index.min().strftime('%Y-%m-%d'),
-            "end": df.index.max().strftime('%Y-%m-%d')
-        }
-    })
+    # Define features to exclude (in addition to datetime and demand)
+    exclude_features = ['demand', 'trip_count', 'unique_vendors', 'weather_id']
     
-    # Store datetime index for later use
-    datetime_index = df.index
+    # Prepare features and target
+    X = df.select_dtypes(exclude=['datetime64'])
+    X = X.drop([col for col in exclude_features if col in X.columns], axis=1)
+    y = df['demand']  # Use normalized demand as target
     
-    # Separate features and target, excluding datetime columns
-    X = df.select_dtypes(exclude=['datetime64']).drop(['demand'], axis=1)
-    y = df['demand']
+    # Get feature names
+    feature_names = X.columns.tolist()
+    
+    # Print feature information
+    print("\nFeature Information:")
+    print(f"Total features: {len(feature_names)}")
+    print("Features:", feature_names)
+    
+    # Create train/test splits
+    n_splits = 3
+    test_size = len(X) // 5  # 20% for testing
+    
+    print(f"\nUsing {n_splits} splits with test_size={test_size} for {len(X)} samples")
     
     # Scale features
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-    X_scaled = pd.DataFrame(X_scaled, columns=X.columns, index=datetime_index)
-    
-    # Calculate appropriate number of splits based on data size
-    n_samples = len(df)
-    test_size = int(n_samples * 0.2)  # 20% for testing
-    n_splits = min(3, (n_samples - test_size) // test_size)  # Ensure we have enough data for splits
-    
-    print(f"Using {n_splits} splits with test_size={test_size} for {n_samples} samples")
+    X_scaled = pd.DataFrame(X_scaled, columns=X.columns, index=df.index)
     
     # Use time series split for validation with adjusted parameters
     tscv = TimeSeriesSplit(n_splits=n_splits, test_size=test_size)
@@ -197,7 +396,7 @@ def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> No
         "cv_params": {
             "n_splits": n_splits,
             "test_size": test_size,
-            "total_samples": n_samples
+            "total_samples": len(X)
         }
     })
     
@@ -239,7 +438,6 @@ def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> No
         })
         
         # Log metrics for each fold
-        logger = task.get_logger()
         logger.report_scalar("CV Metrics", "MSE", iteration=fold, value=mse)
         logger.report_scalar("CV Metrics", "MAE", iteration=fold, value=mae)
         logger.report_scalar("CV Metrics", "R2", iteration=fold, value=r2)
@@ -264,7 +462,7 @@ def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> No
     y_orig = np.expm1(y)
     y_pred_orig = np.expm1(y_pred)
     
-    create_evaluation_plots(y_orig, y_pred_orig, feature_importance, task)
+    create_evaluation_plots(y_orig, y_pred_orig, feature_importance, task, model, X_scaled, df.index)
     
     # Log final metrics
     final_metrics = {
@@ -283,7 +481,7 @@ def train_and_save_model(data_path: str, model_path: str = 'model.joblib') -> No
     joblib.dump({
         'model': model,
         'scaler': scaler,
-        'feature_names': X.columns.tolist(),
+        'feature_names': feature_names,
         'is_log_transformed': True  # Flag to indicate log transformation
     }, model_path)
     
@@ -375,7 +573,6 @@ if __name__ == "__main__":
         'temp_max': 27.0,
         'wind_speed': 5.0,
         'rain_1h': 0.0,
-        'weather_id': 800,
         'is_weekend': 0,
         'is_rush_hour': 1,
         'is_holiday': 0,
@@ -399,7 +596,7 @@ if __name__ == "__main__":
         'hour_cos': np.cos(2 * np.pi * 18/24),
         'day_sin': np.sin(2 * np.pi * 3/7),
         'day_cos': np.cos(2 * np.pi * 3/7),
-        # Initialize lagged features with reasonable values
+        # Lagged features (normalized to 0-100 scale)
         'demand_lag_1h': 50.0,
         'demand_lag_3h': 45.0,
         'demand_lag_24h': 40.0,

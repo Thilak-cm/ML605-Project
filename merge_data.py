@@ -15,7 +15,7 @@ def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
     weather_df['dt_iso'] = pd.to_datetime(weather_df['dt_iso'])
     
     # Round to nearest hour to match with taxi data
-    weather_df['hour'] = weather_df['dt_iso'].dt.floor('H')
+    weather_df['hour'] = weather_df['dt_iso'].dt.floor('h')
     
     # Select relevant features
     weather_features = [
@@ -41,16 +41,41 @@ def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
     # Round to nearest hour
     taxi_df['hour'] = taxi_df['tpep_pickup_datetime'].dt.floor('H')
     
-    # Calculate demand per hour
+    # Calculate demand metrics per hour
     demand_df = taxi_df.groupby('hour').agg({
-        'VendorID': 'count',  # Count trips per hour
+        'VendorID': ['count', 'nunique'],  # Count trips and unique vendors per hour
         'trip_distance': ['mean', 'sum'],  # Average and total distance
         'PULocationID': lambda x: len(x.unique()),  # Number of unique pickup locations
         'is_holiday': 'first'  # Keep holiday information
     }).reset_index()
     
     # Flatten column names
-    demand_df.columns = ['hour', 'demand', 'avg_distance', 'total_distance', 'unique_pickup_locs', 'is_holiday']
+    demand_df.columns = ['hour', 'trip_count', 'unique_vendors', 'avg_distance', 'total_distance', 'unique_pickup_locs', 'is_holiday']
+    
+    # Calculate normalized demand (0-100 scale)
+    # Using a rolling window to get dynamic min/max values
+    window_size = 168  # 1 week
+    demand_df['rolling_max'] = demand_df['trip_count'].rolling(window=window_size, min_periods=1).max()
+    demand_df['rolling_min'] = demand_df['trip_count'].rolling(window=window_size, min_periods=1).min()
+    
+    # Normalize demand to 0-100 scale
+    demand_df['demand'] = 100 * (demand_df['trip_count'] - demand_df['rolling_min']) / (demand_df['rolling_max'] - demand_df['rolling_min'])
+    
+    # Handle edge cases
+    demand_df['demand'] = demand_df['demand'].fillna(0)  # Fill NaN values
+    demand_df['demand'] = demand_df['demand'].clip(0, 100)  # Clip values to 0-100 range
+    
+    # Drop intermediate columns
+    demand_df = demand_df.drop(['rolling_max', 'rolling_min'], axis=1)
+    
+    # Validate demand values
+    if demand_df['demand'].max() > 100 or demand_df['demand'].min() < 0:
+        raise ValueError("Demand values outside expected range of 0-100")
+    
+    print(f"Demand statistics:")
+    print(f"Average demand: {demand_df['demand'].mean():.2f}")
+    print(f"Max demand: {demand_df['demand'].max():.2f}")
+    print(f"Min demand: {demand_df['demand'].min():.2f}")
     
     return demand_df
 

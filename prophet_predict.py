@@ -99,7 +99,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     'ds' for datetime and 'y' for the target variable.
     
     Args:
-        df: Merged features DataFrame
+        df: Merged features DataFrame with normalized demand values
         
     Returns:
         Processed DataFrame ready for Prophet model
@@ -110,18 +110,30 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     
     # Add time-based features that Prophet can use as regressors
     prophet_df['hour_of_day'] = prophet_df['ds'].dt.hour
-    prophet_df['is_weekend'] = prophet_df['ds'].dt.dayofweek.isin([5, 6]).astype(int)
+    prophet_df['day_of_week'] = prophet_df['ds'].dt.dayofweek
+    prophet_df['is_weekend'] = prophet_df['day_of_week'].isin([5, 6]).astype(int)
     prophet_df['is_rush_hour'] = prophet_df['hour_of_day'].isin([7,8,9,16,17,18,19]).astype(int)
     
     # Add weather-based features as regressors
-    weather_features = ['temp', 'feels_like', 'wind_speed', 'rain_1h']
+    weather_features = ['temp', 'feels_like', 'wind_speed', 'rain_1h', 'weather_id']
     
-    # Add distance-based features
-    distance_features = ['avg_distance', 'total_distance', 'unique_pickup_locs']
+    # Add distance and demand-based features
+    demand_features = ['demand_lag_1h', 'demand_lag_2h', 'demand_lag_3h', 
+                      'demand_lag_24h', 'demand_lag_168h']
+    distance_features = ['avg_distance_lag_1h', 'avg_distance_lag_2h', 'avg_distance_lag_3h',
+                        'avg_distance_lag_24h', 'avg_distance_lag_168h']
     
     # Select final features for Prophet
-    selected_features = ['ds', 'demand'] + weather_features + distance_features + ['is_weekend', 'is_rush_hour']
+    selected_features = ['ds', 'demand'] + weather_features + demand_features + distance_features + \
+                       ['is_weekend', 'is_rush_hour', 'day_of_week', 'hour_of_day']
+    
+    # Keep only features that exist in the dataframe
+    selected_features = [f for f in selected_features if f in prophet_df.columns]
     prophet_df = prophet_df[selected_features]
+    
+    # Print feature information for debugging
+    print(f"Total features used: {len(selected_features)}")
+    print("Features:", selected_features)
     
     # Rename demand to y for Prophet
     prophet_df = prophet_df.rename(columns={'demand': 'y'})
@@ -182,118 +194,96 @@ def train_and_save_model(data_path: str = 'data_from_2024/merged_features.csv',
     Also logs experiment to ClearML.
     
     Args:
-        data_path: Path to the merged features CSV file
+        data_path: Path to the merged features CSV file with normalized demand values
         model_path: Path where the model should be saved
     """
     # Initialize ClearML task
     task = Task.init(
         project_name='TaxiDemandPrediction',
-        task_name='ProphetTraining_Improved',
+        task_name='ProphetTraining_Normalized',
         task_type='training'
     )
+    logger = task.get_logger()
     
     # Load data
     print("Loading data...")
     df = pd.read_csv(data_path)
     df['hour'] = pd.to_datetime(df['hour'])
     
+    # Validate demand values are normalized
+    demand_min = df['demand'].min()
+    demand_max = df['demand'].max()
+    if demand_min < 0 or demand_max > 100:
+        print(f"Warning: Demand values outside expected normalized range [0,100]. Min: {demand_min}, Max: {demand_max}")
+    
     # Preprocess data
     print("Preprocessing data...")
-    data = preprocess_data(df)
+    prophet_df = preprocess_data(df)
     
-    # Split into train and test (last 20% for testing)
-    train_size = int(len(data) * 0.8)
-    train_data = data[:train_size]
-    test_data = data[train_size:]
+    # Split data into train and test sets (last 2 weeks for testing)
+    test_size = 14 * 24  # 14 days * 24 hours
+    train_df = prophet_df[:-test_size]
+    test_df = prophet_df[-test_size:]
     
-    # Log dataset info
-    task.connect({
-        "dataset_info": {
-            "train_size": len(train_data),
-            "test_size": len(test_data),
-            "train_date_range": {
-                "start": train_data['ds'].min().strftime('%Y-%m-%d %H:%M'),
-                "end": train_data['ds'].max().strftime('%Y-%m-%d %H:%M')
-            },
-            "test_date_range": {
-                "start": test_data['ds'].min().strftime('%Y-%m-%d %H:%M'),
-                "end": test_data['ds'].max().strftime('%Y-%m-%d %H:%M')
-            }
-        }
-    })
+    print(f"Training data shape: {train_df.shape}")
+    print(f"Test data shape: {test_df.shape}")
     
-    # Configure Prophet model
-    model_params = {
-        'yearly_seasonality': True,
-        'weekly_seasonality': True,
-        'daily_seasonality': True,
-        'seasonality_mode': 'multiplicative',
-        'interval_width': 0.95,
-        'changepoint_prior_scale': 0.05,
-        'seasonality_prior_scale': 10,
-        'holidays_prior_scale': 10,
-    }
-    
-    # Log parameters
-    task.connect({"model_params": model_params})
-    
-    # Initialize and train model
+    # Initialize and train Prophet model with additional regressors
     print("Training model...")
-    model = Prophet(**model_params)
+    model = Prophet(
+        yearly_seasonality=True,
+        weekly_seasonality=True,
+        daily_seasonality=True,
+        seasonality_mode='multiplicative',
+        interval_width=0.95
+    )
     
-    # Add regressors
-    for feature in data.columns:
-        if feature not in ['ds', 'y']:
-            print(f"Adding regressor: {feature}")
-            model.add_regressor(feature)
+    # Add all features except 'ds' and 'y' as regressors
+    regressor_columns = [col for col in train_df.columns if col not in ['ds', 'y']]
+    for column in regressor_columns:
+        model.add_regressor(column)
     
-    # Add custom seasonalities
-    model.add_seasonality(name='rush_hour', period=24, fourier_order=5)
+    # Fit the model
+    model.fit(train_df)
     
-    # Fit model
-    model.fit(train_data)
-    
-    # Evaluate on test data
+    # Evaluate model
     print("Evaluating model...")
-    metrics, forecast = evaluate_model(model, test_data)
-    
-    # Create and log evaluation plots
-    create_evaluation_plots(test_data['y'].values, 
-                          forecast['yhat'].values,
-                          forecast,
-                          task)
+    metrics, forecast_df = evaluate_model(model, test_df)
     
     # Log metrics
-    logger = task.get_logger()
-    for metric_name, value in metrics.items():
-        if not metric_name.startswith('hour_'):  # Log main metrics
-            logger.report_scalar("Main Metrics", metric_name, iteration=0, value=value)
-        else:  # Log hourly metrics separately
-            logger.report_scalar("Hourly RMSE", metric_name, iteration=0, value=value)
-        print(f"{metric_name}: {value:.4f}")
+    for metric_name, metric_value in metrics.items():
+        logger.report_scalar(
+            title='Evaluation Metrics',
+            series=metric_name,
+            value=metric_value,
+            iteration=0
+        )
     
-    # Save model components
-    model_components = {
+    # Create evaluation plots
+    create_evaluation_plots(
+        test_df['y'].values,
+        forecast_df['yhat'].values,
+        forecast_df,
+        task
+    )
+    
+    # Save model and feature list
+    print(f"Saving model to {model_path}...")
+    model_data = {
         'model': model,
-        'metrics': metrics,
-        'params': model_params,
-        'feature_names': list(train_data.columns)
+        'features': regressor_columns,
+        'metrics': metrics
     }
+    joblib.dump(model_data, model_path)
     
-    # Save model locally
-    joblib.dump(model_components, model_path)
-    print(f"Model saved locally to {model_path}")
-    
-    # Register model in ClearML
+    # Upload model to ClearML
     output_model = OutputModel(
         task=task,
-        name='TaxiDemandProphet',
-        framework='prophet',
-        label_enumeration={}
+        name='prophet_model'
     )
-    output_model.update_weights(weights_filename=model_path)
+    output_model.update_weights(model_path)
     
-    print("Model training completed and logged to ClearML")
+    print("Training complete!")
     task.close()
 
 def load_model(model_path: str = 'prophet_model.joblib') -> Dict:
@@ -313,74 +303,112 @@ def load_model(model_path: str = 'prophet_model.joblib') -> Dict:
 
 def predict_demand(input_features: Dict[str, any], forecast_hours: int = 24) -> Dict[str, List[float]]:
     """
-    Predict taxi demand for the next n hours.
+    Predict taxi demand for the next N hours using the trained Prophet model.
     
     Args:
-        input_features: Dictionary containing current feature values
-        forecast_hours: Number of hours to forecast ahead
+        input_features: Dictionary containing feature values for prediction
+                       All values should be normalized/scaled appropriately
+        forecast_hours: Number of hours to forecast (default: 24)
         
     Returns:
-        Dictionary containing predictions and confidence intervals
+        Dictionary containing predicted demand values and confidence intervals
     """
-    model_data = load_model()
-    model = model_data['model']
-    feature_names = model_data['feature_names']
+    global _model
     
-    # Create future dataframe
+    # Load model if not already loaded
+    if _model is None:
+        model_data = load_model()
+        _model = model_data['model']
+        required_features = model_data['features']
+        print("Required features:", required_features)
+    
+    # Validate input features
+    missing_features = [f for f in required_features if f not in input_features]
+    if missing_features:
+        raise ValueError(f"Missing required features: {missing_features}")
+    
+    # Create future dataframe for prediction
     future_dates = pd.date_range(
-        start=pd.to_datetime(input_features['ds']),
+        start=input_features['ds'],
         periods=forecast_hours,
         freq='H'
     )
     
-    future = pd.DataFrame({'ds': future_dates})
+    # Create prediction dataframe with all required features
+    future_df = pd.DataFrame({'ds': future_dates})
     
-    # Add required regressors
-    for feature in feature_names:
-        if feature != 'ds' and feature != 'y':
-            if feature in input_features:
-                future[feature] = input_features[feature]
-            else:
-                raise ValueError(f"Missing required feature: {feature}")
+    # Add time-based features
+    future_df['hour_of_day'] = future_df['ds'].dt.hour
+    future_df['day_of_week'] = future_df['ds'].dt.dayofweek
+    future_df['is_weekend'] = future_df['day_of_week'].isin([5, 6]).astype(int)
+    future_df['is_rush_hour'] = future_df['hour_of_day'].isin([7,8,9,16,17,18,19]).astype(int)
+    
+    # Add other features from input_features
+    for feature in required_features:
+        if feature not in future_df.columns:
+            future_df[feature] = input_features.get(feature, 0)
     
     # Make prediction
-    forecast = model.predict(future)
+    forecast = _model.predict(future_df)
     
+    # Ensure predictions are within normalized range [0, 100]
+    forecast['yhat'] = np.clip(forecast['yhat'], 0, 100)
+    forecast['yhat_lower'] = np.clip(forecast['yhat_lower'], 0, 100)
+    forecast['yhat_upper'] = np.clip(forecast['yhat_upper'], 0, 100)
+    
+    # Return predictions
     return {
-        'timestamps': forecast['ds'].tolist(),
-        'predictions': forecast['yhat'].tolist(),
-        'lower_bound': forecast['yhat_lower'].tolist(),
-        'upper_bound': forecast['yhat_upper'].tolist()
+        'timestamps': future_dates.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+        'demand': forecast['yhat'].tolist(),
+        'demand_lower': forecast['yhat_lower'].tolist(),
+        'demand_upper': forecast['yhat_upper'].tolist()
     }
 
 if __name__ == "__main__":
     # Train model on the merged features dataset
     train_and_save_model()
     
+    # Get current time for test prediction
+    current_time = datetime.now()
+    
     # Test prediction with all required features
     test_features = {
-        'ds': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'ds': current_time.strftime('%Y-%m-%d %H:%M:%S'),
         # Weather features
         'temp': 20.0,
         'feels_like': 19.0,
         'wind_speed': 5.0,
         'rain_1h': 0.0,
-        # Distance features
-        'avg_distance': 2.5,
-        'total_distance': 125.0,
-        'unique_pickup_locs': 25,
+        'weather_id': 800,  # Clear sky
+        # Demand lag features (normalized values)
+        'demand_lag_1h': 50.0,
+        'demand_lag_3h': 45.0,
+        'demand_lag_24h': 55.0,
+        'demand_lag_168h': 52.0,  # Week ago
+        # Distance lag features (normalized values)
+        'avg_distance_lag_1h': 40.0,
+        'avg_distance_lag_3h': 42.0,
+        'avg_distance_lag_24h': 45.0,
+        'avg_distance_lag_168h': 43.0,
         # Time-based features
-        'hour_of_day': datetime.now().hour,
-        'is_weekend': int(datetime.now().weekday() >= 5),
-        'is_rush_hour': int(datetime.now().hour in [7,8,9,16,17,18,19])
+        'hour_of_day': current_time.hour,
+        'day_of_week': current_time.weekday(),
+        'is_weekend': int(current_time.weekday() >= 5),
+        'is_rush_hour': int(current_time.hour in [7,8,9,16,17,18,19])
     }
     
+    # Make prediction
+    print("\nMaking test prediction with features:")
+    for feature, value in test_features.items():
+        print(f"{feature}: {value}")
+        
     prediction = predict_demand(test_features)
-    print("\nTest prediction for next 24 hours:")
+    
+    print("\nPredictions for next 24 hours:")
     for i, (ts, pred, lower, upper) in enumerate(zip(
         prediction['timestamps'],
-        prediction['predictions'],
-        prediction['lower_bound'],
-        prediction['upper_bound']
+        prediction['demand'],
+        prediction['demand_lower'],
+        prediction['demand_upper']
     )):
-        print(f"Hour {i+1}: {pred:.2f} [{lower:.2f}, {upper:.2f}]") 
+        print(f"Hour {i+1}: {ts} - Demand: {pred:.2f} [{lower:.2f}, {upper:.2f}]") 

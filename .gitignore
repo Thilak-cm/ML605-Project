@@ -1,6 +1,6 @@
 # Data files
 *.parquet
-data/*.parquet
+*.csv
 
 # Python
 __pycache__/

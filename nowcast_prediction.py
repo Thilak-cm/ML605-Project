@@ -210,8 +210,8 @@ if __name__ == "__main__":
         df = pd.read_csv('data_from_2024/merged_features.csv')
         df['hour'] = pd.to_datetime(df['hour'])
         
-        # Get a sample zone
-        sample_zone = df['zone_id'].iloc[0]
+        # Get a random sample zone
+        sample_zone = df['zone_id'].sample(n=1).iloc[0]
         zone_data = df[df['zone_id'] == sample_zone].tail(12)  # Last 12 hours
         
         # Load model to get required features

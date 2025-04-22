@@ -64,27 +64,36 @@ def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
     # Keep raw trip count as primary demand metric
     demand_df['demand'] = demand_df['trip_count']
     
-    # Add normalized versions as features
-    print("Adding demand normalization features...")
-    # Sort by zone and hour
+    # Sort by zone and hour for correct lag calculation
     demand_df = demand_df.sort_values(['zone_id', 'hour'])
+    
+    # Add demand normalization features using only historical data
+    print("Adding demand normalization features...")
     grouped = demand_df.groupby('zone_id')
     
-    # 1. Log transform (primary normalization for training)
+    # 1. Log transform (safe to use as it's a point-wise operation)
     demand_df['demand_log'] = np.log1p(demand_df['demand'])
     
-    # 2. Z-score normalization per zone
-    demand_df['demand_zscore'] = grouped['demand'].transform(
-        lambda x: (x - x.mean()) / (x.std() + 1e-8)  # Add epsilon to prevent division by zero
-    )
-    
-    # 3. Min-max scaling per zone with rolling window
+    # 2. Rolling z-score normalization (using only historical data)
     window_size = 168  # 1 week
-    demand_df['demand_minmax'] = grouped['demand'].transform(
-        lambda x: (x - x.rolling(window=window_size, min_periods=1).min()) / \
-                 (x.rolling(window=window_size, min_periods=1).max() - \
-                  x.rolling(window=window_size, min_periods=1).min() + 1e-8)
+    demand_df['demand_rolling_mean'] = grouped['demand'].transform(
+        lambda x: x.rolling(window=window_size, min_periods=1).mean()
     )
+    demand_df['demand_rolling_std'] = grouped['demand'].transform(
+        lambda x: x.rolling(window=window_size, min_periods=1).std()
+    )
+    demand_df['demand_zscore'] = (demand_df['demand'] - demand_df['demand_rolling_mean']) / \
+                                (demand_df['demand_rolling_std'] + 1e-8)
+    
+    # 3. Rolling min-max scaling (using only historical data)
+    demand_df['demand_rolling_min'] = grouped['demand'].transform(
+        lambda x: x.rolling(window=window_size, min_periods=1).min()
+    )
+    demand_df['demand_rolling_max'] = grouped['demand'].transform(
+        lambda x: x.rolling(window=window_size, min_periods=1).max()
+    )
+    demand_df['demand_minmax'] = (demand_df['demand'] - demand_df['demand_rolling_min']) / \
+                                (demand_df['demand_rolling_max'] - demand_df['demand_rolling_min'] + 1e-8)
     
     print("\nDemand statistics by zone:")
     stats_cols = ['demand', 'demand_log', 'demand_zscore', 'demand_minmax']

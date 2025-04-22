@@ -439,22 +439,25 @@ def train_and_save_model(
     
     # Define feature groups
     feature_columns = [
-        'demand_log',  # Log-transformed demand
-        'demand_zscore',  # Z-score normalized demand
-        'temp', 'feels_like', 'wind_speed', 'rain_1h',
-        'hour_of_day', 'day_of_week', 'is_weekend', 'is_holiday',
-        'is_rush_hour'
+        # Weather Features
+        'temp',             # Temperature
+        'feels_like',       # Feels like temperature
+        'wind_speed',       # Wind speed
+        'rain_1h',          # Rainfall
+        
+        # Time Features
+        'hour_of_day',      # Hour of day (0-23)
+        'day_of_week',      # Day of week (0-6)
+        'is_weekend',       # Weekend flag (0/1)
+        'is_holiday',       # Holiday flag (0/1)
+        'is_rush_hour'      # Rush hour flag (0/1)
     ]
     
-    # Verify all features exist
-    missing_features = [col for col in feature_columns if col not in df.columns]
-    if missing_features:
-        print("\nWARNING: Missing features:", missing_features)
-        # Remove missing features from the list
-        feature_columns = [col for col in feature_columns if col in df.columns]
-        print("Proceeding with available features:", feature_columns)
+    # Target column
+    target_column = 'demand'  # Raw demand is our target
     
-    static_columns = ['zone_id']  # Static features per zone
+    # Static features
+    static_columns = ['zone_id']  # Zone identifier
     
     # Check for NaN values
     nan_cols = df[feature_columns + static_columns].isna().sum()

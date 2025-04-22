@@ -207,7 +207,7 @@ if __name__ == "__main__":
         print("Loading sample data and model...")
         print("="*50)
         
-        df = pd.read_csv('data_from_2024/taxi_demand_dataset.csv')
+        df = pd.read_csv('data_from_2024/merged_features.csv')
         df['hour'] = pd.to_datetime(df['hour'])
         
         # Get a random sample zone

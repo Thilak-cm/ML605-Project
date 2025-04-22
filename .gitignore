@@ -37,12 +37,10 @@ ENV/
 *.swo
 
 # Model files
-*.joblib
 *.pkl
 *.h5
 
 # Project specific
-model.joblib
 *.pth
 *.onnx
 *.pb

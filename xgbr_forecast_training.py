@@ -111,5 +111,5 @@ def train_time_based_model(data_path: str, model_path: str = 'time_based_model.j
 
 if __name__ == "__main__":
     # Train time-based model
-    data_path = 'data_from_2024/merged_features.csv'
+    data_path = 'data_from_2024/taxi_demand_dataset.csv'
     train_time_based_model(data_path) 

@@ -70,7 +70,7 @@ if __name__ == "__main__":
     future_date = pd.Timestamp('2025-05-22 18:00:00')
     
     # Sample a zone value from the dataset
-    df = pd.read_csv('data_from_2024/merged_features.csv')
+    df = pd.read_csv('data_from_2024/taxi_demand_dataset.csv')
     # zone_id = df['zone_id'].sample(n=1).iloc[0]
     zone_id = 233
     

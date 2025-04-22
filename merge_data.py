@@ -239,7 +239,7 @@ if __name__ == "__main__":
     # File paths
     taxi_file = "data_from_2024/cleaned_taxi_data_short.csv"
     weather_file = "data_from_2024/weather_data.csv"
-    output_file = "data_from_2024/merged_features.csv"
+    output_file = "data_from_2024/taxi_demand_dataset.csv"
     
     # Merge data
     merge_data(taxi_file, weather_file, output_file) 

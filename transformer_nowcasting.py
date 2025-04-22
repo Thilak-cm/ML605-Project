@@ -394,7 +394,7 @@ def train_model(
     return history
 
 def train_and_save_model(
-    data_path: str = 'data_from_2024/merged_features.csv',
+    data_path: str = 'data_from_2024/taxi_demand_dataset.csv',
     model_path: str = 'transformer_model.pt',
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
     input_seq_len: int = 12,  # Reduced from 24 to 12 hours

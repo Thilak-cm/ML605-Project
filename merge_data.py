@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from tqdm import tqdm
+import holidays
 import os
 
 def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
@@ -30,7 +31,7 @@ def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
 
 def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
     """
-    Load and preprocess taxi data.
+    Load and preprocess taxi data with zone-level demand aggregation.
     """
     print("Loading taxi data...")
     taxi_df = pd.read_csv(taxi_file)
@@ -41,41 +42,56 @@ def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
     # Round to nearest hour
     taxi_df['hour'] = taxi_df['tpep_pickup_datetime'].dt.floor('H')
     
-    # Calculate demand metrics per hour
-    demand_df = taxi_df.groupby('hour').agg({
-        'VendorID': ['count', 'nunique'],  # Count trips and unique vendors per hour
+    # Rename PULocationID to zone_id
+    taxi_df = taxi_df.rename(columns={'PULocationID': 'zone_id'})
+    
+    # Get US holidays
+    us_holidays = holidays.US()
+    taxi_df['is_holiday'] = taxi_df['tpep_pickup_datetime'].dt.date.map(lambda x: x in us_holidays).astype(int)
+    
+    # Calculate demand metrics per hour and zone
+    print("Calculating zone-level demand metrics...")
+    demand_df = taxi_df.groupby(['hour', 'zone_id']).agg({
+        'VendorID': ['count', 'nunique'],  # Count trips and unique vendors
         'trip_distance': ['mean', 'sum'],  # Average and total distance
-        'PULocationID': lambda x: len(x.unique()),  # Number of unique pickup locations
         'is_holiday': 'first'  # Keep holiday information
     }).reset_index()
     
     # Flatten column names
-    demand_df.columns = ['hour', 'trip_count', 'unique_vendors', 'avg_distance', 'total_distance', 'unique_pickup_locs', 'is_holiday']
+    demand_df.columns = ['hour', 'zone_id', 'trip_count', 'unique_vendors', 
+                        'avg_distance', 'total_distance', 'is_holiday']
     
-    # Calculate normalized demand (0-100 scale)
-    # Using a rolling window to get dynamic min/max values
+    # Keep raw trip count as primary demand metric
+    demand_df['demand'] = demand_df['trip_count']
+    
+    # Add normalized versions as features
+    print("Adding demand normalization features...")
+    # Sort by zone and hour
+    demand_df = demand_df.sort_values(['zone_id', 'hour'])
+    grouped = demand_df.groupby('zone_id')
+    
+    # 1. Log transform (primary normalization for training)
+    demand_df['demand_log'] = np.log1p(demand_df['demand'])
+    
+    # 2. Z-score normalization per zone
+    demand_df['demand_zscore'] = grouped['demand'].transform(
+        lambda x: (x - x.mean()) / (x.std() + 1e-8)  # Add epsilon to prevent division by zero
+    )
+    
+    # 3. Min-max scaling per zone with rolling window
     window_size = 168  # 1 week
-    demand_df['rolling_max'] = demand_df['trip_count'].rolling(window=window_size, min_periods=1).max()
-    demand_df['rolling_min'] = demand_df['trip_count'].rolling(window=window_size, min_periods=1).min()
+    demand_df['demand_minmax'] = grouped['demand'].transform(
+        lambda x: (x - x.rolling(window=window_size, min_periods=1).min()) / \
+                 (x.rolling(window=window_size, min_periods=1).max() - \
+                  x.rolling(window=window_size, min_periods=1).min() + 1e-8)
+    )
     
-    # Normalize demand to 0-100 scale
-    demand_df['demand'] = 100 * (demand_df['trip_count'] - demand_df['rolling_min']) / (demand_df['rolling_max'] - demand_df['rolling_min'])
-    
-    # Handle edge cases
-    demand_df['demand'] = demand_df['demand'].fillna(0)  # Fill NaN values
-    demand_df['demand'] = demand_df['demand'].clip(0, 100)  # Clip values to 0-100 range
-    
-    # Drop intermediate columns
-    demand_df = demand_df.drop(['rolling_max', 'rolling_min'], axis=1)
-    
-    # Validate demand values
-    if demand_df['demand'].max() > 100 or demand_df['demand'].min() < 0:
-        raise ValueError("Demand values outside expected range of 0-100")
-    
-    print(f"Demand statistics:")
-    print(f"Average demand: {demand_df['demand'].mean():.2f}")
-    print(f"Max demand: {demand_df['demand'].max():.2f}")
-    print(f"Min demand: {demand_df['demand'].min():.2f}")
+    print("\nDemand statistics by zone:")
+    stats_cols = ['demand', 'demand_log', 'demand_zscore', 'demand_minmax']
+    for col in stats_cols:
+        print(f"\n{col} statistics:")
+        zone_stats = demand_df.groupby('zone_id')[col].agg(['mean', 'std', 'min', 'max']).round(2)
+        print(zone_stats.describe())
     
     return demand_df
 
@@ -83,6 +99,7 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add time-based features to the dataframe.
     """
+    print("Adding time features...")
     # Extract time components
     df['hour_of_day'] = df['hour'].dt.hour
     df['day_of_week'] = df['hour'].dt.dayofweek
@@ -106,6 +123,50 @@ def add_time_features(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
+def add_lagged_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add lagged and rolling features per zone.
+    """
+    print("Adding zone-level lagged features...")
+    # Sort by zone and hour for correct lag calculation
+    df = df.sort_values(['zone_id', 'hour'])
+    
+    # Group by zone for zone-specific calculations
+    grouped = df.groupby('zone_id')
+    
+    # Add lagged features for both raw and normalized demand
+    for lag in [1, 3, 24, 168]:  # 1 hour, 3 hours, 1 day, 1 week
+        # Raw demand lags
+        df[f'demand_lag_{lag}h'] = grouped['demand'].transform(lambda x: x.shift(lag))
+        # Log demand lags
+        df[f'demand_log_lag_{lag}h'] = grouped['demand_log'].transform(lambda x: x.shift(lag))
+        # Distance lags
+        df[f'avg_distance_lag_{lag}h'] = grouped['avg_distance'].transform(lambda x: x.shift(lag))
+    
+    # Add rolling means
+    for window in [3, 6, 12, 24]:
+        # Raw demand rolling stats
+        df[f'demand_rolling_mean_{window}h'] = grouped['demand'].transform(
+            lambda x: x.rolling(window=window, min_periods=1).mean()
+        )
+        df[f'demand_rolling_std_{window}h'] = grouped['demand'].transform(
+            lambda x: x.rolling(window=window, min_periods=1).std()
+        )
+        # Log demand rolling mean
+        df[f'demand_log_rolling_mean_{window}h'] = grouped['demand_log'].transform(
+            lambda x: x.rolling(window=window, min_periods=1).mean()
+        )
+        # Distance rolling mean
+        df[f'avg_distance_rolling_mean_{window}h'] = grouped['avg_distance'].transform(
+            lambda x: x.rolling(window=window, min_periods=1).mean()
+        )
+    
+    # Add demand changes (both raw and log)
+    df['demand_change_1h'] = df['demand'] - df['demand_lag_1h']
+    df['demand_log_change_1h'] = df['demand_log'] - df['demand_log_lag_1h']
+    
+    return df
+
 def merge_data(taxi_file: str, weather_file: str, output_file: str) -> None:
     """
     Merge taxi and weather data, add features, and save to file.
@@ -114,44 +175,60 @@ def merge_data(taxi_file: str, weather_file: str, output_file: str) -> None:
     weather_df = load_and_preprocess_weather(weather_file)
     demand_df = load_and_preprocess_taxi(taxi_file)
     
-    print("Merging data...")
-    # Merge on hour
+    print("Merging weather data...")
+    # Merge on hour (weather data will be duplicated for each zone)
     merged_df = pd.merge(demand_df, weather_df, on='hour', how='left')
     
     # Add time-based features
-    print("Adding time features...")
     merged_df = add_time_features(merged_df)
     
-    # Add lagged features
-    print("Adding lagged features...")
-    for lag in [1, 3, 24, 168]:  # 1 hour, 3 hours, 1 day, 1 week
-        merged_df[f'demand_lag_{lag}h'] = merged_df['demand'].shift(lag)
-        merged_df[f'avg_distance_lag_{lag}h'] = merged_df['avg_distance'].shift(lag)
+    # Add lagged and rolling features
+    merged_df = add_lagged_features(merged_df)
     
-    # Add rolling means
-    print("Adding rolling means...")
-    for window in [3, 6, 12, 24]:
-        merged_df[f'demand_rolling_mean_{window}h'] = merged_df['demand'].rolling(window=window).mean()
-        merged_df[f'avg_distance_rolling_mean_{window}h'] = merged_df['avg_distance'].rolling(window=window).mean()
+    # Drop redundant columns
+    redundant_cols = [
+        'trip_count',  # Same as demand
+        'dt_iso',      # Already captured in temporal features
+        'weather_description',  # Already have weather types
+        'weather_id'   # Redundant with weather types
+    ]
+    merged_df = merged_df.drop(columns=redundant_cols, errors='ignore')
     
-    # Fill NaN values
-    merged_df = merged_df.fillna(method='bfill').fillna(method='ffill')
+    # Fill NaN values using forward fill then backward fill
+    merged_df = merged_df.ffill().bfill()
     
     # Save to file
-    print(f"Saving merged data to {output_file}...")
+    print(f"\nSaving merged data to {output_file}...")
     merged_df.to_csv(output_file, index=False)
     
     print("\nData Summary:")
-    print(f"Total hours: {len(merged_df)}")
+    print(f"Total records: {len(merged_df)}")
+    print(f"Unique zones: {merged_df['zone_id'].nunique()}")
     print(f"Date range: {merged_df['hour'].min()} to {merged_df['hour'].max()}")
-    print(f"Total features: {len(merged_df.columns)}")
-    print("\nFeature list:")
-    for col in sorted(merged_df.columns):
-        print(f"- {col}")
+    
+    # Print final feature list
+    print("\nFinal model input features:")
+    # Exclude 'hour' as it's not a model input
+    feature_cols = [col for col in merged_df.columns if col != 'hour']
+    
+    # Group features by type for better readability
+    feature_groups = {
+        'Demand Features': [col for col in feature_cols if 'demand' in col],
+        'Weather Features': [col for col in feature_cols if any(x in col for x in ['temp', 'rain', 'wind', 'weather_'])],
+        'Time Features': [col for col in feature_cols if any(x in col for x in ['hour', 'day', 'week', 'month', 'period'])],
+        'Trip Features': [col for col in feature_cols if any(x in col for x in ['distance', 'vendors'])],
+        'Other Features': [col for col in feature_cols if not any(x in col for x in ['demand', 'temp', 'rain', 'wind', 'weather_', 'hour', 'day', 'week', 'month', 'period', 'distance', 'vendors'])]
+    }
+    
+    for group, features in feature_groups.items():
+        if features:
+            print(f"\n{group}:")
+            for feature in sorted(features):
+                print(f"- {feature}")
 
 if __name__ == "__main__":
     # File paths
-    taxi_file = "data_from_2024/cleaned_taxi_data.csv"
+    taxi_file = "data_from_2024/cleaned_taxi_data_short.csv"
     weather_file = "data_from_2024/weather_data.csv"
     output_file = "data_from_2024/merged_features.csv"
     

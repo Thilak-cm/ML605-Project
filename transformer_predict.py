@@ -23,21 +23,25 @@ class SimpleTimeSeriesTransformer(nn.Module):
     """
     def __init__(
         self,
-        d_model: int = 8,  # Reduced from 16
-        n_heads: int = 2,  # Reduced from 4
-        n_encoder_layers: int = 1,  # Reduced from 3
-        n_decoder_layers: int = 1,  # Reduced from 3
+        d_model: int = 8,
+        n_heads: int = 2,
+        n_encoder_layers: int = 1,
+        n_decoder_layers: int = 1,
         dropout: float = 0.1,
-        input_seq_len: int = 24,  # Reduced from 168 to 24 hours
-        output_seq_len: int = 24,
+        input_seq_len: int = 12,
+        output_seq_len: int = 12,
+        n_features: int = 1,
+        n_static_features: int = 1
     ):
         super().__init__()
         
         self.input_seq_len = input_seq_len
         self.output_seq_len = output_seq_len
+        self.n_features = n_features
         
-        # Simple input projection
-        self.input_projection = nn.Linear(1, d_model)
+        # Input projections
+        self.feature_projection = nn.Linear(n_features, d_model)
+        self.static_projection = nn.Linear(n_static_features, d_model)
         
         # Simplified positional encoding
         self.pos_encoder = nn.Parameter(torch.randn(1, input_seq_len + output_seq_len, d_model))
@@ -46,14 +50,14 @@ class SimpleTimeSeriesTransformer(nn.Module):
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=n_heads,
-            dim_feedforward=d_model * 2,  # Reduced from 4
+            dim_feedforward=d_model * 2,
             dropout=dropout,
             batch_first=True
         )
         decoder_layer = nn.TransformerDecoderLayer(
             d_model=d_model,
             nhead=n_heads,
-            dim_feedforward=d_model * 2,  # Reduced from 4
+            dim_feedforward=d_model * 2,
             dropout=dropout,
             batch_first=True
         )
@@ -63,15 +67,19 @@ class SimpleTimeSeriesTransformer(nn.Module):
         
         # Output projection
         self.output_projection = nn.Linear(d_model, 1)
+    
+    def forward(self, src: torch.Tensor, tgt_features: torch.Tensor, static_features: torch.Tensor) -> torch.Tensor:
+        # Project input features
+        src = self.feature_projection(src)  # [batch, input_seq_len, d_model]
+        tgt = self.feature_projection(tgt_features)  # [batch, output_seq_len, d_model]
         
-    def forward(self, src: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
-        # Project input and target to d_model dimensions
-        src = self.input_projection(src)
-        tgt = self.input_projection(tgt)
+        # Project and expand static features
+        static = self.static_projection(static_features)  # [batch, d_model]
+        static = static.unsqueeze(1).expand(-1, src.size(1), -1)  # [batch, seq_len, d_model]
         
-        # Add positional encoding
-        src = src + self.pos_encoder[:, :src.size(1)]
-        tgt = tgt + self.pos_encoder[:, :tgt.size(1)]
+        # Add static features and positional encoding
+        src = src + static + self.pos_encoder[:, :src.size(1)]
+        tgt = tgt + static[:, :tgt.size(1)] + self.pos_encoder[:, :tgt.size(1)]
         
         # Create mask for decoder
         tgt_mask = generate_square_subsequent_mask(tgt.size(1)).to(tgt.device)
@@ -81,7 +89,7 @@ class SimpleTimeSeriesTransformer(nn.Module):
         output = self.decoder(tgt, memory, tgt_mask=tgt_mask)
         
         # Project back to original dimension
-        output = self.output_projection(output)
+        output = self.output_projection(output)  # [batch, output_seq_len, 1]
         
         return output
 
@@ -92,29 +100,77 @@ def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
     return mask
 
 class TimeSeriesDataset(Dataset):
-    """Dataset class for time series data."""
+    """Dataset class for time series data with multiple features."""
     def __init__(
         self,
-        data: np.ndarray,
-        input_seq_len: int = 24,  # Reduced from 168
-        output_seq_len: int = 24,
-        stride: int = 24  # Increased stride for less overlap
+        data: pd.DataFrame,
+        feature_columns: List[str],
+        static_columns: List[str],
+        target_column: str = 'demand',
+        input_seq_len: int = 12,
+        output_seq_len: int = 12,
+        stride: int = 1
     ):
-        self.data = torch.FloatTensor(data.reshape(-1))
+        self.feature_columns = feature_columns
+        self.static_columns = static_columns
+        self.target_column = target_column
         self.input_seq_len = input_seq_len
         self.output_seq_len = output_seq_len
         self.stride = stride
         
-    def __len__(self) -> int:
-        return (len(self.data) - self.input_seq_len - self.output_seq_len) // self.stride + 1
+        # Group by zone_id and convert to list of sequences
+        self.sequences = []
+        
+        print(f"\nCreating sequences from {len(data)} total records")
+        print(f"Unique zones: {data['zone_id'].nunique()}")
+        print(f"Features used: {feature_columns}")
+        
+        for zone_id, group in data.groupby('zone_id'):
+            if len(group) < input_seq_len + output_seq_len:
+                print(f"Skipping zone {zone_id}: insufficient data (only {len(group)} records)")
+                continue
+                
+            # Sort by hour to ensure temporal ordering
+            group = group.sort_values('hour')
+            
+            # Create sequences with overlap
+            n_sequences = (len(group) - input_seq_len - output_seq_len) // stride + 1
+            
+            for i in range(0, len(group) - input_seq_len - output_seq_len + 1, stride):
+                # Input features
+                features = torch.FloatTensor(group[feature_columns].iloc[i:i + input_seq_len].values)
+                
+                # Target sequence (using all features for the target timeframe)
+                target_idx = slice(i + input_seq_len, i + input_seq_len + output_seq_len)
+                target_features = torch.FloatTensor(group[feature_columns].iloc[target_idx].values)
+                
+                # Static features (zone information)
+                static = torch.FloatTensor(group[static_columns].iloc[0].values)
+                
+                self.sequences.append({
+                    'features': features,  # [input_seq_len, n_features]
+                    'target_features': target_features,  # [output_seq_len, n_features]
+                    'target': torch.FloatTensor(group[target_column].iloc[target_idx].values).unsqueeze(-1),  # [output_seq_len, 1]
+                    'static': static  # [n_static_features]
+                })
+            
+            if len(group) > 1000:  # Only print for zones with significant data
+                print(f"Zone {zone_id}: created {n_sequences} sequences from {len(group)} records")
+        
+        print(f"\nTotal sequences created: {len(self.sequences)}")
+        if len(self.sequences) == 0:
+            raise ValueError("No valid sequences could be created! Check your data and sequence lengths.")
     
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        start_idx = idx * self.stride
-        end_idx = start_idx + self.input_seq_len + self.output_seq_len
-        sequence = self.data[start_idx:end_idx]
+    def __len__(self) -> int:
+        return len(self.sequences)
+    
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        seq = self.sequences[idx]
         return (
-            sequence[:self.input_seq_len].view(-1, 1),
-            sequence[self.input_seq_len:].view(-1, 1)
+            seq['features'],  # [input_seq_len, n_features]
+            seq['target_features'],  # [output_seq_len, n_features]
+            seq['target'],  # [output_seq_len, 1]
+            seq['static']  # [n_static_features]
         )
 
 def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
@@ -260,11 +316,11 @@ def train_model(
     train_loader: DataLoader,
     val_loader: DataLoader,
     device: torch.device,
-    n_epochs: int = 30,  # Increased from 10 to 30
+    n_epochs: int = 5,
     learning_rate: float = 0.001,
-    patience: int = 5  # Increased from 3 to 5
+    patience: int = 5
 ) -> Dict[str, List[float]]:
-    """Simplified training loop with early stopping."""
+    """Training loop with early stopping."""
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     criterion = nn.MSELoss()
     history = {'train_loss': [], 'val_loss': []}
@@ -276,23 +332,39 @@ def train_model(
         # Training
         model.train()
         train_losses = []
-        for batch_x, batch_y in train_loader:
-            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+        
+        train_iterator = tqdm(train_loader, desc=f'Epoch {epoch+1}/{n_epochs} [Train]')
+        for batch_x, batch_tgt_features, batch_y, batch_static in train_iterator:
+            batch_x = batch_x.to(device)
+            batch_tgt_features = batch_tgt_features.to(device)
+            batch_y = batch_y.to(device)
+            batch_static = batch_static.to(device)
+            
             optimizer.zero_grad()
-            y_pred = model(batch_x, batch_y)
+            y_pred = model(batch_x, batch_tgt_features, batch_static)
             loss = criterion(y_pred, batch_y)
             loss.backward()
             optimizer.step()
             train_losses.append(loss.item())
+            
+            train_iterator.set_postfix({'loss': f'{loss.item():.4f}'})
         
         # Validation
         model.eval()
         val_losses = []
         with torch.no_grad():
-            for batch_x, batch_y in val_loader:
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
-                y_pred = model(batch_x, batch_y)
-                val_losses.append(criterion(y_pred, batch_y).item())
+            val_iterator = tqdm(val_loader, desc=f'Epoch {epoch+1}/{n_epochs} [Val]')
+            for batch_x, batch_tgt_features, batch_y, batch_static in val_iterator:
+                batch_x = batch_x.to(device)
+                batch_tgt_features = batch_tgt_features.to(device)
+                batch_y = batch_y.to(device)
+                batch_static = batch_static.to(device)
+                
+                y_pred = model(batch_x, batch_tgt_features, batch_static)
+                val_loss = criterion(y_pred, batch_y)
+                val_losses.append(val_loss.item())
+                
+                val_iterator.set_postfix({'loss': f'{val_loss.item():.4f}'})
         
         # Calculate average losses
         avg_train_loss = np.mean(train_losses)
@@ -300,7 +372,7 @@ def train_model(
         history['train_loss'].append(avg_train_loss)
         history['val_loss'].append(avg_val_loss)
         
-        print(f"Epoch {epoch+1}/{n_epochs}")
+        print(f"\nEpoch {epoch+1}/{n_epochs}")
         print(f"Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
         
         # Early stopping with model saving
@@ -324,210 +396,158 @@ def train_model(
 def train_and_save_model(
     data_path: str = 'data_from_2024/merged_features.csv',
     model_path: str = 'transformer_model.pt',
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+    input_seq_len: int = 12,  # Reduced from 24 to 12 hours
+    output_seq_len: int = 12,  # Reduced from 24 to 12 hours
+    min_records_per_zone: int = 100  # Minimum number of records needed per zone
 ) -> None:
-    """Train and save the simplified transformer model."""
+    """Train and save the transformer model."""
     # Initialize ClearML task
     task = Task.init(
         project_name='TaxiDemandPrediction',
-        task_name=f'SimpleTransformerTraining_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
+        task_name=f'ZoneLevelTransformer_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
         task_type='training'
     )
     
-    # Load and preprocess data
+    # Load data
     print("Loading data...")
     df = pd.read_csv(data_path)
     df['hour'] = pd.to_datetime(df['hour'])
-    demand = df['demand'].values
     
-    # Scale the data
+    print("\nInitial data shape:", df.shape)
+    print("Time range:", df['hour'].min(), "to", df['hour'].max())
+    print("Number of zones:", df['zone_id'].nunique())
+    
+    # Analyze zone-level data
+    zone_counts = df.groupby('zone_id').size()
+    print("\nZone-level statistics:")
+    print(f"Records per zone (min): {zone_counts.min()}")
+    print(f"Records per zone (max): {zone_counts.max()}")
+    print(f"Records per zone (mean): {zone_counts.mean():.2f}")
+    print(f"Records per zone (median): {zone_counts.median()}")
+    
+    # Filter zones with sufficient data
+    valid_zones = zone_counts[zone_counts >= min_records_per_zone].index
+    print(f"\nFound {len(valid_zones)} zones with {min_records_per_zone}+ records")
+    
+    if len(valid_zones) == 0:
+        raise ValueError(f"No zones have {min_records_per_zone}+ records. Try reducing min_records_per_zone.")
+    
+    # Filter dataframe to include only valid zones
+    df = df[df['zone_id'].isin(valid_zones)].copy()
+    print(f"Filtered data shape: {df.shape}")
+    
+    # Define feature groups
+    feature_columns = [
+        'demand_log',  # Log-transformed demand
+        'demand_zscore',  # Z-score normalized demand
+        'temp', 'feels_like', 'wind_speed', 'rain_1h',
+        'hour_of_day', 'day_of_week', 'is_weekend', 'is_holiday',
+        'is_rush_hour'
+    ]
+    
+    # Verify all features exist
+    missing_features = [col for col in feature_columns if col not in df.columns]
+    if missing_features:
+        print("\nWARNING: Missing features:", missing_features)
+        # Remove missing features from the list
+        feature_columns = [col for col in feature_columns if col in df.columns]
+        print("Proceeding with available features:", feature_columns)
+    
+    static_columns = ['zone_id']  # Static features per zone
+    
+    # Check for NaN values
+    nan_cols = df[feature_columns + static_columns].isna().sum()
+    if nan_cols.any():
+        print("\nWARNING: NaN values found in columns:")
+        print(nan_cols[nan_cols > 0])
+        print("Filling NaN values with appropriate methods...")
+        
+        # Fill NaN values appropriately
+        for col in feature_columns:
+            if df[col].isna().any():
+                if 'demand' in col:
+                    df[col] = df.groupby('zone_id')[col].transform(lambda x: x.fillna(x.mean()))
+                else:
+                    df[col] = df[col].fillna(df[col].mean())
+    
+    # Scale features
+    print("\nScaling features...")
     scaler = StandardScaler()
-    scaled_data = scaler.fit_transform(demand.reshape(-1, 1))
+    df[feature_columns] = scaler.fit_transform(df[feature_columns])
     
-    # Create datasets with simplified sequence lengths
-    input_seq_len = 24  # 1 day
-    output_seq_len = 24  # 1 day prediction
+    # Sort by time and zone for proper splitting
+    df = df.sort_values(['hour', 'zone_id'])
     
-    # Split data
-    train_size = int(0.8 * len(scaled_data))
-    val_size = int(0.1 * len(scaled_data))
+    # Split data by time while maintaining zone integrity
+    train_cutoff = df['hour'].quantile(0.8)
+    val_cutoff = df['hour'].quantile(0.9)
     
-    train_data = scaled_data[:train_size]
-    val_data = scaled_data[train_size:train_size + val_size]
-    test_data = scaled_data[train_size + val_size:]
+    train_data = df[df['hour'] <= train_cutoff]
+    val_data = df[(df['hour'] > train_cutoff) & (df['hour'] <= val_cutoff)]
+    test_data = df[df['hour'] > val_cutoff]
     
-    # Create datasets
-    train_dataset = TimeSeriesDataset(train_data, input_seq_len, output_seq_len)
-    val_dataset = TimeSeriesDataset(val_data, input_seq_len, output_seq_len)
-    test_dataset = TimeSeriesDataset(test_data, input_seq_len, output_seq_len)
+    print("\nData split sizes:")
+    print(f"Train: {len(train_data)} records, {train_data['zone_id'].nunique()} zones")
+    print(f"Val: {len(val_data)} records, {val_data['zone_id'].nunique()} zones")
+    print(f"Test: {len(test_data)} records, {test_data['zone_id'].nunique()} zones")
     
-    # Create data loaders with larger batch size
-    batch_size = 64
+    # Create datasets with reduced sequence lengths
+    print("\nCreating datasets...")
+    train_dataset = TimeSeriesDataset(
+        train_data, feature_columns, static_columns,
+        input_seq_len=input_seq_len, 
+        output_seq_len=output_seq_len
+    )
+    val_dataset = TimeSeriesDataset(
+        val_data, feature_columns, static_columns,
+        input_seq_len=input_seq_len, 
+        output_seq_len=output_seq_len
+    )
+    test_dataset = TimeSeriesDataset(
+        test_data, feature_columns, static_columns,
+        input_seq_len=input_seq_len, 
+        output_seq_len=output_seq_len
+    )
+    
+    # Create data loaders
+    batch_size = 32
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size)
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
     
-    # Initialize model
+    # Initialize model with reduced sequence lengths
     model = SimpleTimeSeriesTransformer(
+        n_features=len(feature_columns),
+        n_static_features=len(static_columns),
         input_seq_len=input_seq_len,
         output_seq_len=output_seq_len
     ).to(device)
     
-    # Log parameters
-    task.connect({
-        "model_params": {
-            "d_model": 8,
-            "n_heads": 2,
-            "n_encoder_layers": 1,
-            "n_decoder_layers": 1,
-            "dropout": 0.1,
-            "input_seq_len": input_seq_len,
-            "output_seq_len": output_seq_len
-        },
-        "training_params": {
-            "batch_size": batch_size,
-            "learning_rate": 0.001,
-            "n_epochs": 30,
-            "patience": 5
-        }
-    })
-    
     # Train model
-    print("Training model...")
+    print("\nTraining model...")
+    print(f"Input sequence length: {input_seq_len} hours")
+    print(f"Output sequence length: {output_seq_len} hours")
+    print(f"Number of features: {len(feature_columns)}")
+    print(f"Training on {len(valid_zones)} zones")
+    
     history = train_model(model, train_loader, val_loader, device)
     
-    # Evaluate on test set
-    model.eval()
-    all_y_true = []
-    all_y_pred = []
-    test_dates = []
-    
-    with torch.no_grad():
-        for batch_x, batch_y in test_loader:
-            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
-            y_pred = model(batch_x, batch_y)
-            all_y_true.extend(scaler.inverse_transform(batch_y.cpu().numpy().reshape(-1, 1)).flatten())
-            all_y_pred.extend(scaler.inverse_transform(y_pred.cpu().numpy().reshape(-1, 1)).flatten())
-            # Generate dates for this batch
-            test_dates.extend([df['hour'].iloc[-len(test_data):] + pd.Timedelta(hours=i) for i in range(len(batch_y))])
-    
-    # Create evaluation plots
-    create_evaluation_plots(
-        model,
-        np.array(all_y_true),
-        np.array(all_y_pred),
-        history,
-        task,
-        dates=test_dates
-    )
-    
-    # Log metrics
-    logger = task.get_logger()
-    for epoch, (train_loss, val_loss) in enumerate(zip(history['train_loss'], history['val_loss'])):
-        logger.report_scalar("Loss", "train", iteration=epoch, value=train_loss)
-        logger.report_scalar("Loss", "validation", iteration=epoch, value=val_loss)
-    
-    # Calculate and log final metrics
-    mse = mean_squared_error(all_y_true, all_y_pred)
-    rmse = np.sqrt(mse)
-    mae = mean_absolute_error(all_y_true, all_y_pred)
-    r2 = r2_score(all_y_true, all_y_pred)
-    
-    logger.report_scalar("Final Metrics", "RMSE", iteration=0, value=rmse)
-    logger.report_scalar("Final Metrics", "MAE", iteration=0, value=mae)
-    logger.report_scalar("Final Metrics", "R2", iteration=0, value=r2)
-    
-    # Save model
+    # Save model and metadata
     torch.save({
         'model_state_dict': model.state_dict(),
         'scaler': scaler,
+        'feature_columns': feature_columns,
+        'static_columns': static_columns,
+        'history': history,
         'input_seq_len': input_seq_len,
         'output_seq_len': output_seq_len,
-        'history': history,
-        'metrics': {
-            'rmse': rmse,
-            'mae': mae,
-            'r2': r2
-        }
+        'valid_zones': list(valid_zones)
     }, model_path)
     
-    # Register model in ClearML
-    output_model = OutputModel(
-        task=task,
-        name='SimpleTaxiDemandTransformer',
-        framework='pytorch'
-    )
-    output_model.update_weights(weights_filename=model_path)
-    
-    print(f"\nTraining completed with final metrics:")
-    print(f"RMSE: {rmse:.2f}")
-    print(f"MAE: {mae:.2f}")
-    print(f"R2: {r2:.4f}")
-    
+    print("\nModel saved successfully!")
     task.close()
-
-def predict_demand(
-    input_features: Dict[str, any],
-    model_path: str = 'transformer_model.pt',
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
-) -> Dict[str, List[float]]:
-    """Make predictions using the simplified transformer model."""
-    # Load model
-    checkpoint = torch.load(model_path, map_location=device)
-    model = SimpleTimeSeriesTransformer(
-        input_seq_len=checkpoint['input_seq_len'],
-        output_seq_len=checkpoint['output_seq_len']
-    ).to(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
-    
-    scaler = checkpoint['scaler']
-    
-    # Prepare input data
-    if 'historical_demand' not in input_features:
-        raise ValueError("Missing required feature: historical_demand")
-    
-    historical_demand = np.array(input_features['historical_demand'])
-    if len(historical_demand) != model.input_seq_len:
-        raise ValueError(f"Historical demand must contain {model.input_seq_len} hours of data")
-    
-    # Scale input
-    scaled_input = scaler.transform(historical_demand.reshape(-1, 1))
-    x = torch.FloatTensor(scaled_input).unsqueeze(0).to(device)
-    
-    # Initialize target with zeros
-    tgt = torch.zeros((1, model.output_seq_len, 1), device=device)
-    
-    # Generate prediction
-    with torch.no_grad():
-        scaled_pred = model(x, tgt)
-    
-    # Ensure correct shape for inverse_transform
-    predictions = scaler.inverse_transform(scaled_pred.cpu().squeeze().numpy().reshape(-1, 1))
-    predictions = predictions.flatten()  # Convert back to 1D array for output
-    
-    # Generate timestamps
-    start_time = pd.Timestamp(input_features.get('timestamp', pd.Timestamp.now()))
-    timestamps = [start_time + timedelta(hours=i) for i in range(len(predictions))]
-    
-    return {
-        'timestamp': [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in timestamps],
-        'demand': predictions.tolist()
-    }
 
 if __name__ == "__main__":
     # Train model
-    train_and_save_model()
-    
-    # Test prediction
-    historical_demand = np.random.normal(100, 20, 24)  # 24 hours of historical data
-    
-    test_features = {
-        'timestamp': '2025-02-01 00:00:00',
-        'historical_demand': historical_demand.tolist()
-    }
-    
-    prediction = predict_demand(test_features)
-    print("\nTest prediction for next 24 hours:")
-    for ts, demand in zip(prediction['timestamp'], prediction['demand']):
-        print(f"{ts}: {demand:.2f}") 
+    train_and_save_model() 

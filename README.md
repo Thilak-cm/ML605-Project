@@ -12,7 +12,7 @@ This project predicts short-term (30–60 minute) taxi demand across NYC zones b
 
 ## 🧱 System Architecture
 
-![System Flow Diagram](./assets/system_flow_diagram.png)
+![System Flow Diagram](./taxi%20demand%20project%20flow%20chart.png)
 
 ### Key Modules:
 - **Taxi & Weather Data** (historical): Feature engineering + preprocessing

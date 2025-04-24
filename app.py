@@ -1,13 +1,34 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from nowcast_predict import predict_demand
 from forecasting_prediction import predict_future_demand
+import mock_weather_data
 import pandas as pd
 import logging
 import traceback
 import sys
+import csv
+import time
+import requests
+import holidays
+
+# NOTE: Please do NOT push this API Key to Github!!!
+API_KEY = '<REPLACE WITH API KEY>'
+
+# Dictionary to store zone to coordinate mapping
+data_store = {}
+
+def load_mapping_data() -> None:
+    """
+    Load CSV mapping data into a dictionary on startup.
+    This prevents from reading csv for each request
+    """
+    global data_store
+    with open("zone_lookup_lat_long.csv", mode="r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        data_store = {int(row["LocationID"]): (row['Latitude'], row['Longitude']) for row in reader}
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +49,11 @@ app = FastAPI(
     license_info={"name": "MIT"}
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Runs on application startup"""
+    load_mapping_data()
+
 class PredictionRequest(BaseModel):
     timestamp: str
     zone_id: int
@@ -38,6 +64,52 @@ class PredictionResponse(BaseModel):
     zone_id: int
     demand: float
     model_used: str
+
+class LiveFeaturesResponse(BaseModel):
+    lat: str
+    long: str
+    zone_id: int
+    timestamp: str
+    features: Optional[Dict[str, List[float]]]
+
+def extract_weather_data(weather_data):
+    features = {
+        "temp": [],
+        "feels_like": [],
+        "wind_speed": [],
+        "rain_1h": [],
+        "hour_of_day": [],
+        "day_of_week": [],
+        "is_weekend": [],
+        "is_holiday": [],
+        "is_rush_hour": []
+    }
+    for weather in weather_data:
+        # Extract information
+        timestamp_fmt = datetime.fromtimestamp(float(weather["data"][0]["dt"]), tz=timezone.utc)
+        hour_of_day = timestamp_fmt.hour
+        day_of_week = timestamp_fmt.weekday() # Full name of the day
+        is_weekend = day_of_week >= 5  # Saturday(5) or Sunday(6)
+
+        # Check if it's a public holiday (US example)
+        us_holidays = holidays.US()
+        is_holiday = timestamp_fmt.date() in us_holidays
+
+        features["temp"].append(float(weather["data"][0]["temp"]))
+        features["feels_like"].append(float(weather["data"][0]["feels_like"]))
+        features["wind_speed"].append(float(weather["data"][0]["wind_speed"]))
+        # 2 - Thunderstorm, 3 - Drizzle, 5 - Rain, 6 - Snow
+        features["rain_1h"].append(float(1 if int(str(weather["data"][0]["weather"][0]["id"])[0]) in [2, 3, 5, 6] else 0))
+
+        features["hour_of_day"].append(float(hour_of_day))
+        features["day_of_week"].append(float(day_of_week))
+        features["is_weekend"].append(float(is_weekend))
+        features["is_holiday"].append(float(is_holiday))
+        # Morning Rush Hour: 7:00 AM – 10:00 AM
+        # Evening Rush Hour: 4:00 PM – 7:00 PM
+        features["is_rush_hour"].append(1 if (hour_of_day >= 7 and hour_of_day <= 10) or (hour_of_day >= 16 and hour_of_day <= 19) else 0)
+
+    return features
 
 def should_use_xgboost(timestamp: str) -> bool:
     """
@@ -241,6 +313,116 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
             status_code=500,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+@app.get("/live-features/")
+async def live_features(zone_id: int, dt: int = None, mock: bool = True):
+    """
+    This function retrieves live weather features for a specified zone. 
+    It performs validation checks on the zone ID and timestamp, fetches 
+    historical weather data from OpenWeather API (or mock data), and 
+    returns the extracted features.
+
+    Parameters:
+    - zone_id (int): Identifier for the geographic zone.
+    - dt (int, optional): Unix timestamp for the requested data (default: current time).
+    - mock (bool, optional): If True, returns mock weather data instead of making an API call.
+
+    Returns:
+    - LiveFeaturesResponse: A structured object containing location details and extracted features.
+
+    Raises:
+    - HTTPException (400): If the zone ID is invalid or the timestamp is not within a valid range.
+
+    Process:
+    1. Validate `zone_id`: Check if it exists in `data_store`; if not, raise an error.
+    2. Validate `dt`:
+       - If `dt` is None, set it to the current Unix timestamp.
+       - Ensure the timestamp is numeric and within a reasonable range (past 1970, not too far into the future).
+       - Convert the timestamp to a datetime object for verification.
+    3. Retrieve the latitude and longitude for the given `zone_id`.
+    4. Generate a list of timestamps (past 12 hours in hourly intervals).
+    5. Fetch weather data:
+       - If `mock` is True, use predefined mock data.
+       - Otherwise, send API requests to OpenWeather for each timestamp and retrieve JSON responses.
+    6. Extract relevant weather features using `extract_weather_data()`.
+    7. Return a structured response containing location details, timestamp, and weather features.
+    """
+    if zone_id not in data_store:
+        error_msg = f"Invalid zone: {str(zone_id)}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=400,
+            detail=error_msg
+            )
+    if not dt:
+        dt = int(time.time())
+
+    try:
+        # Ensure it's a number
+        timestamp = float(dt)  
+        
+        # Check if it falls within a reasonable range (e.g., past 1970, not too far into the future)
+        if timestamp < 0 or timestamp > time.time() + 10**9:
+            error_msg = f"Invalid timestamp: {str(dt)}"
+            logger.error(error_msg)
+            raise HTTPException(
+                status_code=400,
+                detail=error_msg
+                )
+
+        # Convert to datetime to ensure validity
+        datetime.fromtimestamp(timestamp, tz=timezone.utc)
+    except ValueError as e:
+        error_msg = f"Invalid timestamp: {str(e)}"
+        logger.error(error_msg)
+        raise HTTPException(
+            status_code=400,
+            detail=error_msg
+            )
+
+    lat, long = data_store[zone_id]
+    time_window = []
+
+    for i in range(11, -1, -1):
+        time_window.append(dt - (i * 3600))
+
+    # NOTE: There is a limitation with the Weather API, we have only 1000 API calls per day,
+    # so if doing development, please make sure to just use the mock data until ready to fully test.
+    # Therefore, you can just use the mock data in the `mock_weather_data.py`, please adjust as needed.
+    # You can use query param `mock` and set it to `False` to use the Weather API.
+    if mock:
+        weather_data = mock_weather_data.MOCK_WEATHER_DATA
+    else:
+        weather_data = []
+        for temp_dt in time_window:
+            url = f"https://api.openweathermap.org/data/3.0/onecall/timemachine?lat={lat}&lon={long}&dt={temp_dt}&units=metric&appid={API_KEY}"
+
+            payload={}
+            headers = {}
+
+            response = requests.request("GET", url, headers=headers, data=payload)
+
+            if response.status_code != 200:
+                error_msg = f"Please verify API Key"
+                logger.error(error_msg)
+                raise HTTPException(
+                    status_code=400,
+                    detail=error_msg
+                    )
+
+
+            weather_data.append(response.json())
+            
+
+    features = extract_weather_data(weather_data)
+
+    return LiveFeaturesResponse(
+        lat=lat,
+        long=long,
+        zone_id=zone_id,
+        timestamp=datetime.fromtimestamp(float(dt), tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        features=features
+    )
 
 @app.get("/")
 async def root():

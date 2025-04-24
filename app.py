@@ -10,12 +10,12 @@ import logging
 import traceback
 import sys
 import csv
+import os
 import time
 import requests
 import holidays
 
-# NOTE: Please do NOT push this API Key to Github!!!
-API_KEY = '<REPLACE WITH API KEY>'
+API_KEY = os.getenv('api_key')
 
 # Dictionary to store zone to coordinate mapping
 data_store = {}

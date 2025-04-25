@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timezone
 from nowcast_predict import predict_demand
-from forecasting_prediction import predict_future_demand
+from forecasting_predict import predict_future_demand
 import mock_weather_data
 import pandas as pd
 import logging

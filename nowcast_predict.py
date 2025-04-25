@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-MODEL_PATH = 'transformer_model.pt'
+MODEL_PATH = 'models/transformer_model.pt'
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class SimpleTimeSeriesTransformer(nn.Module):
@@ -207,7 +207,7 @@ if __name__ == "__main__":
         print("Loading sample data and model...")
         print("="*50)
         
-        df = pd.read_csv('data_from_2024/merged_features.csv')
+        df = pd.read_csv('data_from_2024/taxi_demand_dataset.csv')
         df['hour'] = pd.to_datetime(df['hour'])
         
         # Get a random sample zone

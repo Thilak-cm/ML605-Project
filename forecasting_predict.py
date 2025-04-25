@@ -6,7 +6,7 @@ from datetime import datetime
 import os
 from typing import Dict
 
-def load_model(model_path: str = 'time_based_model.joblib') -> Dict:
+def load_model(model_path: str = 'models/time_based_model.joblib') -> Dict:
     """
     Load the trained model and scaler from disk.
     
@@ -21,7 +21,7 @@ def load_model(model_path: str = 'time_based_model.joblib') -> Dict:
     
     return joblib.load(model_path)
 
-def predict_future_demand(timestamp: pd.Timestamp, zone_id: int, model_path: str = 'time_based_model.joblib') -> float:
+def predict_future_demand(timestamp: pd.Timestamp, zone_id: int, model_path: str = 'models/time_based_model.joblib') -> float:
     """
     Predict demand for a future timestamp and zone using only time-based features.
     

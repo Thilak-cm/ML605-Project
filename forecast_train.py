@@ -130,6 +130,8 @@ def train_time_based_model(
         model_path: Path to save the model
         enable_clearml: Whether to enable ClearML logging
     """
+    print("Training XGBoost model...")
+    print("="*50)
     # Create models directory if it doesn't exist
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     

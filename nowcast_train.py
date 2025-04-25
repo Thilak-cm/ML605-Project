@@ -369,6 +369,8 @@ def train_and_save_model(
     min_records_per_zone: int = 100,
     enable_clearml: bool = True
 ) -> None:
+    print("Training transformer model...")
+    print("="*50)
     # Create models directory if it doesn't exist
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
 

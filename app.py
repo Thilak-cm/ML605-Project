@@ -14,8 +14,35 @@ import os
 import time
 import requests
 import holidays
+from dotenv import load_dotenv
 
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler('api_errors.log')
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file
+logger.info("Current working directory: %s", os.getcwd())
+logger.info("Checking if .env exists: %s", os.path.exists('.env'))
+if os.path.exists('.env'):
+    with open('.env', 'r') as f:
+        logger.info("Contents of .env: %s", f.read())
+
+load_dotenv()
+logger.info("Environment after load_dotenv:")
+logger.info("API_KEY from env: %s", os.getenv('api_key'))
+
+# Get API key with error handling
 API_KEY = os.getenv('api_key')
+if not API_KEY:
+    logger.error("OpenWeather API key not found! Please set 'api_key' in .env file")
+    # Don't raise error here to allow mock data to work
 
 # Dictionary to store zone to coordinate mapping
 data_store = {}
@@ -30,22 +57,11 @@ def load_mapping_data() -> None:
         reader = csv.DictReader(file)
         data_store = {int(row["LocationID"]): (row['Latitude'], row['Longitude']) for row in reader}
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('api_errors.log')
-    ]
-)
-logger = logging.getLogger(__name__)
-
 app = FastAPI(
     title="NYC Taxi Demand Prediction API",
-    description="🚕 Predict demand using Transformer (short-term) and XGBoost (long-term)",
+    description="🚕 Predict demand using Transformer for short-term and XGBoost for long-term when weather forecasts are either not available or not reliable",
     version="1.0.0",
-    contact={"name": "Thilak Mohan"},
+    contact={"name": "MSML650 Computing Systems for Machine Learning Spring 2025"},
     license_info={"name": "MIT"}
 )
 

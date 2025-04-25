@@ -14,7 +14,7 @@ import math
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import os
 
 class SimpleTimeSeriesTransformer(nn.Module):
     """
@@ -362,13 +362,16 @@ def train_model(
 
 def train_and_save_model(
     data_path: str = 'data_from_2024/taxi_demand_dataset.csv',
-    model_path: str = 'transformer_model.pt',
+    model_path: str = 'models/transformer_model.pt',
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
     input_seq_len: int = 12,
     output_seq_len: int = 12,
     min_records_per_zone: int = 100,
     enable_clearml: bool = True
 ) -> None:
+    # Create models directory if it doesn't exist
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+
     """Train and save the transformer model."""
     # Initialize ClearML task if enabled
     task = None
@@ -511,7 +514,8 @@ def train_and_save_model(
     print(f"Training on {len(valid_zones)} zones")
     
     history = train_model(model, train_loader, val_loader, device)
-    
+    print("Model training completed!")
+
     # Save model and metadata
     torch.save({
         'model_state_dict': model.state_dict(),
@@ -524,7 +528,7 @@ def train_and_save_model(
         'valid_zones': list(valid_zones)
     }, model_path)
     
-    print("\nModel saved successfully!")
+    print(f"\nModel saved to {model_path}")
     
     # Close ClearML task if it was initialized
     if task:

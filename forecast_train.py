@@ -8,6 +8,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import os
 
 def create_evaluation_plots(model, X, y, feature_names, task=None):
     """
@@ -118,7 +119,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
 def train_time_based_model(
     data_path: str, 
-    model_path: str = 'time_based_model.joblib',
+    model_path: str = 'models/time_based_model.joblib',
     enable_clearml: bool = True
 ) -> None:
     """
@@ -129,6 +130,9 @@ def train_time_based_model(
         model_path: Path to save the model
         enable_clearml: Whether to enable ClearML logging
     """
+    # Create models directory if it doesn't exist
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    
     # Initialize ClearML task if enabled
     task = None
     if enable_clearml:
@@ -176,6 +180,8 @@ def train_time_based_model(
     
     # Scale features
     scaler = StandardScaler()
+
+    print("\nScaling features...")
     X_scaled = scaler.fit_transform(X)
     X_scaled = pd.DataFrame(X_scaled, columns=X.columns, index=df.index)
     
@@ -201,7 +207,9 @@ def train_time_based_model(
     
     # Initialize and train model
     model = xgb.XGBRegressor(**model_params)
+    print("Training model...")
     model.fit(X_scaled, y, verbose=False)
+    print("\nTime-based model training completed")
     
     # Create evaluation plots
     create_evaluation_plots(model, X_scaled, y, time_features, task)
@@ -213,7 +221,7 @@ def train_time_based_model(
         'feature_names': X.columns.tolist()
     }, model_path)
     
-    print("\nTime-based model training completed")
+    print(f"Model saved to {model_path}")
     
     # Close ClearML task if it was initialized
     if task:

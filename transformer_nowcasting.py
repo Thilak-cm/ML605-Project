@@ -5,7 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
 from typing import Dict, Tuple, List
-from clearml import Task, OutputModel
+from clearml import Task
 import joblib
 import os
 from datetime import datetime, timedelta
@@ -173,19 +173,28 @@ class TimeSeriesDataset(Dataset):
             seq['static']  # [n_static_features]
         )
 
-def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
+def create_evaluation_plots(model, y_true, y_pred, history, task=None, dates=None):
     """
-    Create comprehensive evaluation plots and log them to ClearML
+    Create comprehensive evaluation plots and optionally log them to ClearML
     
     Args:
         model: Trained transformer model
         y_true: True values
         y_pred: Predicted values
         history: Training history dictionary
-        task: ClearML task object
+        task: Optional ClearML task object. If None, plots are only displayed
         dates: Optional datetime index for time-based plots
     """
-    logger = task.get_logger()
+    # Helper function to handle plot logging
+    def log_plot(title, series, fig):
+        if task:
+            task.get_logger().report_matplotlib_figure(
+                title=title,
+                series=series,
+                figure=fig,
+                iteration=0
+            )
+        plt.close()
     
     # 1. Training History Plot
     plt.figure(figsize=(12, 6))
@@ -196,13 +205,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
     plt.title('Training History')
     plt.legend()
     plt.grid(True)
-    logger.report_matplotlib_figure(
-        title="Training History",
-        series="Training",
-        figure=plt.gcf(),
-        iteration=0
-    )
-    plt.close()
+    log_plot("Training History", "Training", plt.gcf())
     
     # 2. Prediction vs Actual Plot
     plt.figure(figsize=(12, 6))
@@ -211,13 +214,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
     plt.xlabel('Actual Values')
     plt.ylabel('Predicted Values')
     plt.title('Prediction vs Actual')
-    logger.report_matplotlib_figure(
-        title="Prediction vs Actual",
-        series="Evaluation",
-        figure=plt.gcf(),
-        iteration=0
-    )
-    plt.close()
+    log_plot("Prediction vs Actual", "Evaluation", plt.gcf())
     
     # 3. Residual Plot
     residuals = y_true - y_pred
@@ -227,13 +224,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
     plt.xlabel('Predicted Values')
     plt.ylabel('Residuals')
     plt.title('Residual Plot')
-    logger.report_matplotlib_figure(
-        title="Residuals",
-        series="Evaluation",
-        figure=plt.gcf(),
-        iteration=0
-    )
-    plt.close()
+    log_plot("Residuals", "Evaluation", plt.gcf())
     
     # 4. Residual Distribution
     plt.figure(figsize=(12, 6))
@@ -241,13 +232,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
     plt.xlabel('Residual Value')
     plt.ylabel('Count')
     plt.title('Residual Distribution')
-    logger.report_matplotlib_figure(
-        title="Residual Distribution",
-        series="Evaluation",
-        figure=plt.gcf(),
-        iteration=0
-    )
-    plt.close()
+    log_plot("Residual Distribution", "Evaluation", plt.gcf())
     
     # 5. Error Metrics Over Time
     if dates is not None:
@@ -255,7 +240,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
         flat_dates = []
         for date_series in dates:
             flat_dates.extend(date_series)
-        flat_dates = flat_dates[:len(residuals)]  # Ensure same length as residuals
+        flat_dates = flat_dates[:len(residuals)]
         
         plt.figure(figsize=(15, 6))
         plt.plot(flat_dates, np.abs(residuals), alpha=0.5)
@@ -263,17 +248,11 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
         plt.ylabel('Absolute Error')
         plt.title('Absolute Error Over Time')
         plt.xticks(rotation=45)
-        logger.report_matplotlib_figure(
-            title="Error Over Time",
-            series="Time Analysis",
-            figure=plt.gcf(),
-            iteration=0
-        )
-        plt.close()
+        log_plot("Error Over Time", "Time Analysis", plt.gcf())
         
         # 6. Hourly Error Patterns
         hourly_errors = pd.DataFrame({
-            'hour': pd.DatetimeIndex(flat_dates).hour,  # Use flattened dates
+            'hour': pd.DatetimeIndex(flat_dates).hour,
             'abs_error': np.abs(residuals)
         })
         plt.figure(figsize=(12, 6))
@@ -281,13 +260,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
         plt.xlabel('Hour of Day')
         plt.ylabel('Absolute Error')
         plt.title('Error Distribution by Hour')
-        logger.report_matplotlib_figure(
-            title="Hourly Error Patterns",
-            series="Time Analysis",
-            figure=plt.gcf(),
-            iteration=0
-        )
-        plt.close()
+        log_plot("Hourly Error Patterns", "Time Analysis", plt.gcf())
     
     # 7. Prediction Intervals (if available)
     if hasattr(model, 'predict_interval'):
@@ -301,13 +274,7 @@ def create_evaluation_plots(model, y_true, y_pred, history, task, dates=None):
             plt.ylabel('Value')
             plt.title('Predictions with Confidence Intervals')
             plt.legend()
-            logger.report_matplotlib_figure(
-                title="Prediction Intervals",
-                series="Evaluation",
-                figure=plt.gcf(),
-                iteration=0
-            )
-            plt.close()
+            log_plot("Prediction Intervals", "Evaluation", plt.gcf())
         except:
             pass
 
@@ -397,17 +364,26 @@ def train_and_save_model(
     data_path: str = 'data_from_2024/taxi_demand_dataset.csv',
     model_path: str = 'transformer_model.pt',
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
-    input_seq_len: int = 12,  # Reduced from 24 to 12 hours
-    output_seq_len: int = 12,  # Reduced from 24 to 12 hours
-    min_records_per_zone: int = 100  # Minimum number of records needed per zone
+    input_seq_len: int = 12,
+    output_seq_len: int = 12,
+    min_records_per_zone: int = 100,
+    enable_clearml: bool = True
 ) -> None:
     """Train and save the transformer model."""
-    # Initialize ClearML task
-    task = Task.init(
-        project_name='TaxiDemandPrediction',
-        task_name=f'ZoneLevelTransformer_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
-        task_type='training'
-    )
+    # Initialize ClearML task if enabled
+    task = None
+    if enable_clearml:
+        try:
+            from clearml import Task
+            task = Task.init(
+                project_name='TaxiDemandPrediction',
+                task_name=f'ZoneLevelTransformer_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
+                task_type='training'
+            )
+        except Exception as e:
+            print(f"\nWarning: ClearML initialization failed: {str(e)}")
+            print("Continuing without ClearML logging...")
+            enable_clearml = False
     
     # Load data
     print("Loading data...")
@@ -549,8 +525,11 @@ def train_and_save_model(
     }, model_path)
     
     print("\nModel saved successfully!")
-    task.close()
+    
+    # Close ClearML task if it was initialized
+    if task:
+        task.close()
 
 if __name__ == "__main__":
-    # Train model
-    train_and_save_model() 
+    # Train model with optional ClearML
+    train_and_save_model(enable_clearml=True)  # Set to False to disable ClearML 

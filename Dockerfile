@@ -2,10 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY transformer_nowcasting.py .
-COPY data_from_2024 ./data_from_2024
-
+# Copy only the training script and requirements
+COPY xgbr_forecast_training.py .
 COPY requirements.txt .
+
+# Install dependencies
 RUN pip install -r requirements.txt
 
-CMD ["python", "transformer_nowcasting.py"]
+# Command to run the training script
+CMD ["python", "xgbr_forecast_training.py"]

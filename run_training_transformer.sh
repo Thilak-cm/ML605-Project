@@ -5,7 +5,7 @@
 
 # Build the image
 # Uncomment after first run
-# docker build -t transformer-model-training -f Dockerfile.transformer .
+docker build -t transformer-model-training -f Dockerfile.transformer .
 
 # Run the container with volume mounts
 docker run --rm \

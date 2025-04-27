@@ -333,7 +333,7 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
 @app.get("/live-features/")
 async def live_features(zone_id: int, dt: int = None, mock: bool = True):
     """
-    This function retrieves live weather features for a specified zone. 
+    This function retrieves live weather features for a specified zone.
     It performs validation checks on the zone ID and timestamp, fetches 
     historical weather data from OpenWeather API (or mock data), and 
     returns the extracted features.
@@ -444,7 +444,7 @@ async def live_features(zone_id: int, dt: int = None, mock: bool = True):
 async def root():
     """API health check endpoint."""
     return {
-        "status": "ok",
+        "status": "okay this works as expected!",
         "message": "NYC Taxi Demand Prediction API is running",
         "models": {
             "transformer": "Short-term predictions (up to 2 weeks)",

@@ -419,7 +419,7 @@ async def live_features(zone_id: int, dt: int = None, mock: bool = True):
             response = requests.request("GET", url, headers=headers, data=payload)
 
             if response.status_code != 200:
-                error_msg = f"Please verify API Key"
+                error_msg = f"Please verify API Key or {response.text}"
                 logger.error(error_msg)
                 raise HTTPException(
                     status_code=400,

@@ -5,57 +5,36 @@ document.addEventListener('DOMContentLoaded', function() {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    let zonePolygons = {};
+    let zoneMarkers = {}; // Renamed from zonePolygons
     let selectedZone = null;
-
-    // Add a flag to track if a prediction request is in progress
     let isPredictionInProgress = false;
 
-    // Populate zone dropdown and load zone boundaries
-    console.log("Starting fetch for /static/data/zones.json"); // Log fetch start
-    fetch('/static/data/zones.json')
+    // Fetch zone data with coordinates from the new endpoint
+    console.log("Starting fetch for /zones-with-coords");
+    fetch('/zones-with-coords')
         .then(response => {
-            console.log(`zones.json fetch response status: ${response.status}`); // Log response status
+            console.log(`/zones-with-coords fetch response status: ${response.status}`);
             if (!response.ok) {
-                console.error(`Failed to fetch zones.json: ${response.statusText}. Using default zones.`);
-                // If zones.json doesn't exist yet, use hardcoded zones
-                populateZoneDropdown(getDefaultZones());
-                return null; // Return null to indicate failure
+                throw new Error(`Failed to fetch zone data: ${response.statusText}`);
             }
-            // Try parsing JSON only if response is ok
-            return response.json().catch(jsonError => {
-                 console.error("Error parsing zones.json:", jsonError);
-                 populateZoneDropdown(getDefaultZones()); // Use defaults on parse error
-                 return null; // Return null on parse error
-            });
+            return response.json();
         })
-        .then(data => {
-            console.log("Received data from zones.json fetch:", data); // Log received data
-            if (data) {
-                // Populate dropdown even if geojson is missing
-                if (data.zones) {
-                    populateZoneDropdown(data.zones);
-                    console.log("Populated dropdown with zones from JSON.");
-                } else {
-                    console.warn("zones.json loaded but missing 'zones' array. Using default zones.");
-                    populateZoneDropdown(getDefaultZones());
-                }
-
-                // If geojson is available, add zone boundaries to map
-                if (data.geojson) {
-                    console.log("Found geojson data, calling addZoneBoundaries.");
-                    addZoneBoundaries(data.geojson);
-                } else {
-                    console.warn("GeoJSON data missing in zones.json. Map boundaries will not be added.");
-                }
+        .then(zonesData => {
+            console.log("Received zone data:", zonesData);
+            if (zonesData && zonesData.length > 0) {
+                populateZoneDropdown(zonesData); // Populate dropdown
+                addZoneMarkers(zonesData); // Add markers to map
             } else {
-                 console.log("No valid data received from zones.json fetch (using defaults).");
+                console.error("No zone data received or data is empty.");
+                // Optionally populate dropdown with defaults if needed
+                // populateZoneDropdown(getDefaultZones());
             }
         })
         .catch(error => {
-            // Catch network errors or errors from .then() blocks
-            console.error('Network error or other issue loading zones.json:', error);
-            populateZoneDropdown(getDefaultZones());
+            console.error('Error loading zone data:', error);
+            alert(`Failed to load zone data from server: ${error.message}. Map markers will not be available.`);
+            // Optionally populate dropdown with defaults if needed
+            // populateZoneDropdown(getDefaultZones());
         });
 
     // Handle form submission
@@ -95,99 +74,94 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function populateZoneDropdown(zones) {
         const dropdown = document.getElementById('zone-id');
+        // Clear existing options first (optional)
+        dropdown.innerHTML = '<option value="">-- Select Zone --</option>';
         zones.forEach(zone => {
             const option = document.createElement('option');
             option.value = zone.id;
-            option.textContent = `${zone.id}: ${zone.name}`;
+            // Use a consistent naming, e.g., from the fetched data
+            option.textContent = `${zone.id}: ${zone.name || 'Unknown Zone'}`;
             dropdown.appendChild(option);
         });
+        console.log("Populated dropdown with zones.");
     }
 
-    function addZoneBoundaries(geojson) {
-        console.log("Inside addZoneBoundaries function."); // Log entry
-        try { // Add try-catch around L.geoJSON
-            L.geoJSON(geojson, {
-                style: function(feature) {
-                    // Default style for all zones
-                    return {
-                        color: '#666',
-                        weight: 1,
-                        opacity: 0.7,
-                        fillOpacity: 0.3,
-                        fillColor: '#aaa' // Neutral grey
-                    };
-                },
-                onEachFeature: function(feature, layer) {
-                    // Check if properties and zone_id exist
-                    if (feature && feature.properties && feature.properties.zone_id) {
-                        const zoneId = feature.properties.zone_id;
-                        // console.log(`Processing feature for zoneId: ${zoneId}`); // Optional: Log each feature
-                        zonePolygons[zoneId] = layer; // Assign layer to the object
+    // Renamed and modified function to add markers
+    function addZoneMarkers(zonesData) {
+        console.log("Inside addZoneMarkers function.");
+        zonesData.forEach(zone => {
+            if (zone.lat != null && zone.lon != null) {
+                const zoneId = zone.id;
+                const lat = zone.lat;
+                const lon = zone.lon;
 
-                        layer.on('click', function() {
-                            console.log(`Map click detected on zone: ${zoneId}`); // Log map click
-                            document.getElementById('zone-id').value = zoneId;
-                            // Highlight with a simple selection style only
-                            highlightZone(zoneId);
-                        });
+                const marker = L.circleMarker([lat, lon], {
+                    radius: 5, // Default radius
+                    fillColor: "#aaa", // Default fill color (grey)
+                    color: "#333", // Border color
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.6 // Default fill opacity
+                }).addTo(map);
 
-                        // Add popup safely
-                        const zoneName = feature.properties.zone_name || 'N/A';
-                        layer.bindPopup(`<strong>Zone ${zoneId}</strong><br>${zoneName}`);
-                    } else {
-                         console.warn("Skipping feature due to missing properties or zone_id:", feature);
-                    }
-                }
-            }).addTo(map);
-            console.log("Finished adding GeoJSON layer to map. zonePolygons keys:", Object.keys(zonePolygons)); // Log completion and keys
-        } catch (geojsonError) {
-             console.error("Error processing GeoJSON data:", geojsonError); // Log errors during GeoJSON processing
-        }
+                marker.on('click', function() {
+                    console.log(`Map click detected on marker for zone: ${zoneId}`);
+                    document.getElementById('zone-id').value = zoneId;
+                    highlightZone(zoneId); // Call highlight function
+                });
+
+                // Add popup
+                const zoneName = zone.name || 'N/A';
+                marker.bindPopup(`<strong>Zone ${zoneId}</strong><br>${zoneName}`);
+
+                zoneMarkers[zoneId] = marker; // Store marker reference
+            } else {
+                console.warn(`Skipping zone ${zone.id} due to missing coordinates.`);
+            }
+        });
+        console.log("Finished adding markers to map. zoneMarkers keys:", Object.keys(zoneMarkers));
     }
 
-    // Revert highlightZone to only handle selection/deselection with a fixed color
+    // Modify highlightZone to style markers
     function highlightZone(zoneId) {
-        console.log(`highlightZone called for zoneId: ${zoneId}`); // Log entry
+        console.log(`highlightZone called for zoneId: ${zoneId}`);
 
-        // Reset previously selected zone to default grey
-        if (selectedZone && zonePolygons[selectedZone]) {
-            console.log(`Resetting style for previous zone: ${selectedZone}`);
-            zonePolygons[selectedZone].setStyle({
-                color: '#666',
-                weight: 1,
-                opacity: 0.7,
-                fillColor: '#aaa', // Reset fill to neutral grey
-                fillOpacity: 0.3
+        // Reset previously selected marker style
+        if (selectedZone && zoneMarkers[selectedZone]) {
+            console.log(`Resetting style for previous zone marker: ${selectedZone}`);
+            zoneMarkers[selectedZone].setStyle({
+                radius: 5, // Reset radius
+                fillColor: "#aaa", // Reset fill color
+                fillOpacity: 0.6 // Reset fill opacity
             });
         } else if (selectedZone) {
-             console.log(`Previous zone ${selectedZone} polygon not found in zonePolygons.`);
+             console.log(`Previous zone ${selectedZone} marker not found in zoneMarkers.`);
         }
 
-        // Style for simple selection (e.g., yellow/orange)
+        // Style for selected marker (e.g., larger, orange)
         const highlightStyle = {
-            color: '#333', // Darker border
-            weight: 2,
-            opacity: 1.0,
-            fillColor: '#f39c12', // Yellow/Orange for selection indication
-            fillOpacity: 0.6
+            radius: 8, // Increase radius
+            fillColor: '#f39c12', // Orange color
+            fillOpacity: 0.9 // Make more opaque
         };
 
         // Apply the determined style
-        const targetPolygon = zonePolygons[zoneId]; // Get polygon reference
-        if (targetPolygon) {
-            console.log(`Applying highlight style to zone: ${zoneId}`, highlightStyle);
+        const targetMarker = zoneMarkers[zoneId]; // Get marker reference
+        if (targetMarker) {
+            console.log(`Applying highlight style to zone marker: ${zoneId}`, highlightStyle);
             try {
-                targetPolygon.setStyle(highlightStyle);
-                targetPolygon.bringToFront();
-                console.log(`Successfully applied style to zone: ${zoneId}`);
+                targetMarker.setStyle(highlightStyle);
+                targetMarker.bringToFront();
+                console.log(`Successfully applied style to zone marker: ${zoneId}`);
             } catch (styleError) {
-                console.error(`Error applying style to zone ${zoneId}:`, styleError); // Log styling errors
+                console.error(`Error applying style to zone marker ${zoneId}:`, styleError);
             }
         } else {
-            console.error(`Polygon not found for zoneId: ${zoneId}. Available zones:`, Object.keys(zonePolygons)); // Log if polygon is missing
+            // This error should be less likely now if addZoneMarkers worked
+            console.error(`Marker not found for zoneId: ${zoneId}. Available markers:`, Object.keys(zoneMarkers));
         }
 
-        selectedZone = zoneId; // Update selectedZone *after* attempting highlight
+        selectedZone = zoneId; // Update selectedZone
     }
 
 
@@ -350,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const datetimeElement = document.getElementById('prediction-datetime');
                     if (datetimeElement) datetimeElement.textContent = result.timestamp;
 
-                    // Highlight the zone on the map with simple selection style
+                    // Highlight the zone marker on the map with simple selection style
                     highlightZone(zoneId);
 
                 } catch (error) {
@@ -363,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         demandElement.textContent = "Error displaying formatted results. Raw value: " + 
                             (result.demand ? result.demand : "unavailable");
                     }
-                    // Highlight zone with simple selection style even if UI update fails
+                    // Highlight zone marker even if UI update fails
                     highlightZone(zoneId);
                 }
 
@@ -498,7 +472,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const datetimeElement = document.getElementById('prediction-datetime');
         if (datetimeElement) datetimeElement.textContent = timestamp;
 
-        // Highlight the zone on the map with simple selection style
+        // Highlight the zone marker on the map with simple selection style
         highlightZone(zoneId);
     }
     
@@ -603,7 +577,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const datetimeElement = document.getElementById('prediction-datetime');
         if (datetimeElement) datetimeElement.textContent = timestamp;
 
-        // Highlight the zone on the map with simple selection style
+        // Highlight the zone marker on the map with simple selection style
         highlightZone(zoneId);
     }
 
@@ -633,22 +607,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return '#e74c3c';                 // Red
     }
 
-    function getDefaultZones() {
-        // Some common NYC taxi zones
-        return [
-            { id: 43, name: "Central Park" },
-            { id: 237, name: "Upper East Side South" },
-            { id: 161, name: "Midtown Center" },
-            { id: 162, name: "Midtown East" },
-            { id: 230, name: "Times Sq/Theatre District" },
-            { id: 48, name: "Clinton East" },
-            { id: 100, name: "Flatiron" },
-            { id: 163, name: "Midtown North" },
-            { id: 170, name: "Murray Hill" },
-            { id: 236, name: "Upper East Side North" },
-            { id: 239, name: "Upper West Side South" }
-        ];
-    }
+    // Remove getDefaultZones if no longer needed as fallback
+    // function getDefaultZones() { ... }
 
     function getMockHistoricalFeatures() {
         return {

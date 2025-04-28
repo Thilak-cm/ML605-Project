@@ -51,16 +51,42 @@ if not API_KEY:
 
 # Dictionary to store zone to coordinate mapping
 data_store = {}
+# Add a list to store basic zone info for the dropdown/markers
+zone_list_store = []
 
 def load_mapping_data() -> None:
     """
-    Load CSV mapping data into a dictionary on startup.
-    This prevents from reading csv for each request
+    Load CSV mapping data into a dictionary and list on startup.
     """
-    global data_store
-    with open("zone_lookup_lat_long.csv", mode="r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        data_store = {int(row["LocationID"]): (row['Latitude'], row['Longitude']) for row in reader}
+    global data_store, zone_list_store
+    try:
+        with open("zone_lookup_lat_long.csv", mode="r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            temp_data_store = {}
+            temp_zone_list = []
+            for row in reader:
+                try:
+                    zone_id = int(row["LocationID"])
+                    lat = float(row['Latitude']) # Ensure float
+                    lon = float(row['Longitude']) # Ensure float
+                    temp_data_store[zone_id] = (lat, lon)
+                    temp_zone_list.append({
+                        "id": zone_id,
+                        "name": row.get("Zone", "Unknown Zone"), # Use Zone name
+                        "borough": row.get("Borough", "Unknown Borough"),
+                        "lat": lat,
+                        "lon": lon
+                    })
+                except (ValueError, KeyError) as row_err:
+                    logger.warning(f"Skipping row due to error: {row_err}. Row: {row}")
+            data_store = temp_data_store
+            zone_list_store = temp_zone_list
+            logger.info(f"Successfully loaded {len(data_store)} zones with coordinates.")
+    except FileNotFoundError:
+        logger.error("zone_lookup_lat_long.csv not found. Cannot load zone coordinates.")
+    except Exception as e:
+        logger.exception(f"Error loading zone mapping data: {e}")
+
 
 app = FastAPI(
     title="NYC Taxi Demand Prediction API",
@@ -76,6 +102,17 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/ui", response_class=HTMLResponse)
 async def serve_frontend(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+# NEW Endpoint to serve zone data with coordinates
+@app.get("/zones-with-coords")
+async def get_zones_with_coordinates():
+    """Returns a list of zones with their ID, name, borough, lat, and lon."""
+    if not zone_list_store:
+        # Attempt to load again if empty, or handle error
+        load_mapping_data()
+        if not zone_list_store:
+             raise HTTPException(status_code=500, detail="Zone coordinate data not loaded on server.")
+    return zone_list_store
 
 
 @app.on_event("startup")

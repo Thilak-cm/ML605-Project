@@ -1,15 +1,47 @@
 {
-    "zones": [
-      { "id": 43, "name": "Central Park" },
-      { "id": 237, "name": "Upper East Side South" },
-      { "id": 161, "name": "Midtown Center" },
-      { "id": 162, "name": "Midtown East" },
-      { "id": 230, "name": "Times Sq/Theatre District" },
-      { "id": 48, "name": "Clinton East" },
-      { "id": 100, "name": "Flatiron" },
-      { "id": 163, "name": "Midtown North" },
-      { "id": 170, "name": "Murray Hill" },
-      { "id": 236, "name": "Upper East Side North" },
-      { "id": 239, "name": "Upper West Side South" }
+  "zones": [
+    { "id": 43, "name": "Central Park" },
+    { "id": 237, "name": "Upper East Side South" },
+    { "id": 161, "name": "Midtown Center" },
+    { "id": 162, "name": "Midtown East" },
+    { "id": 230, "name": "Times Sq/Theatre District" },
+    { "id": 48, "name": "Clinton East" },
+    { "id": 100, "name": "Flatiron" },
+    { "id": 163, "name": "Midtown North" },
+    { "id": 170, "name": "Murray Hill" },
+    { "id": 236, "name": "Upper East Side North" },
+    { "id": 239, "name": "Upper West Side South" }
+    // ... potentially add all other zones if needed for the dropdown ...
+  ],
+  "geojson": {
+    "type": "FeatureCollection",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": {
+          "zone_id": 1, // Example property name, ensure it matches what addZoneBoundaries expects
+          "zone_name": "Newark Airport", // Example property name
+          "borough": "EWR" // Example property name
+          // ... other properties ...
+        },
+        "geometry": {
+          "type": "Polygon", // Or MultiPolygon
+          "coordinates": [ // Array of coordinate arrays defining the shape
+            [
+              [-74.1844529999999, 40.6950009999999],
+              [-74.1844529999999, 40.6950009999999],
+              // ... more coordinates ...
+              [-74.1844529999999, 40.6950009999999]
+            ]
+          ]
+        }
+      },
+      {
+        "type": "Feature",
+        "properties": { "zone_id": 2, /* ... */ },
+        "geometry": { /* ... */ }
+      }
+      // ... more features for all other zones ...
     ]
   }
+}

@@ -206,3 +206,12 @@ footer {
         height: 400px;
     }
 }
+
+.selected-zone {
+    background-color: #f39c12; /* Match the selection color used in JS */
+}
+
+/* Add style for the default marker color */
+.default-zone {
+    background-color: #aaa; /* Match the default marker fill color */
+}

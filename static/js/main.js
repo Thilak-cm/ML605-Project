@@ -12,26 +12,49 @@ document.addEventListener('DOMContentLoaded', function() {
     let isPredictionInProgress = false;
 
     // Populate zone dropdown and load zone boundaries
+    console.log("Starting fetch for /static/data/zones.json"); // Log fetch start
     fetch('/static/data/zones.json')
         .then(response => {
+            console.log(`zones.json fetch response status: ${response.status}`); // Log response status
             if (!response.ok) {
+                console.error(`Failed to fetch zones.json: ${response.statusText}. Using default zones.`);
                 // If zones.json doesn't exist yet, use hardcoded zones
                 populateZoneDropdown(getDefaultZones());
-                return null;
+                return null; // Return null to indicate failure
             }
-            return response.json();
+            // Try parsing JSON only if response is ok
+            return response.json().catch(jsonError => {
+                 console.error("Error parsing zones.json:", jsonError);
+                 populateZoneDropdown(getDefaultZones()); // Use defaults on parse error
+                 return null; // Return null on parse error
+            });
         })
         .then(data => {
+            console.log("Received data from zones.json fetch:", data); // Log received data
             if (data) {
-                populateZoneDropdown(data.zones);
+                // Populate dropdown even if geojson is missing
+                if (data.zones) {
+                    populateZoneDropdown(data.zones);
+                    console.log("Populated dropdown with zones from JSON.");
+                } else {
+                    console.warn("zones.json loaded but missing 'zones' array. Using default zones.");
+                    populateZoneDropdown(getDefaultZones());
+                }
+
                 // If geojson is available, add zone boundaries to map
                 if (data.geojson) {
+                    console.log("Found geojson data, calling addZoneBoundaries.");
                     addZoneBoundaries(data.geojson);
+                } else {
+                    console.warn("GeoJSON data missing in zones.json. Map boundaries will not be added.");
                 }
+            } else {
+                 console.log("No valid data received from zones.json fetch (using defaults).");
             }
         })
         .catch(error => {
-            console.error('Error loading zones:', error);
+            // Catch network errors or errors from .then() blocks
+            console.error('Network error or other issue loading zones.json:', error);
             populateZoneDropdown(getDefaultZones());
         });
 
@@ -81,59 +104,103 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function addZoneBoundaries(geojson) {
-        L.geoJSON(geojson, {
-            style: function(feature) {
-                return {
-                    color: '#666',
-                    weight: 1,
-                    opacity: 0.7,
-                    fillOpacity: 0.3,
-                    fillColor: '#aaa'
-                };
-            },
-            onEachFeature: function(feature, layer) {
-                const zoneId = feature.properties.zone_id;
-                zonePolygons[zoneId] = layer;
-                
-                layer.on('click', function() {
-                    document.getElementById('zone-id').value = zoneId;
-                    highlightZone(zoneId);
-                });
-                
-                layer.bindPopup(`<strong>Zone ${zoneId}</strong><br>${feature.properties.zone_name}`);
-            }
-        }).addTo(map);
+        console.log("Inside addZoneBoundaries function."); // Log entry
+        try { // Add try-catch around L.geoJSON
+            L.geoJSON(geojson, {
+                style: function(feature) {
+                    // Default style for all zones
+                    return {
+                        color: '#666',
+                        weight: 1,
+                        opacity: 0.7,
+                        fillOpacity: 0.3,
+                        fillColor: '#aaa' // Neutral grey
+                    };
+                },
+                onEachFeature: function(feature, layer) {
+                    // Check if properties and zone_id exist
+                    if (feature && feature.properties && feature.properties.zone_id) {
+                        const zoneId = feature.properties.zone_id;
+                        // console.log(`Processing feature for zoneId: ${zoneId}`); // Optional: Log each feature
+                        zonePolygons[zoneId] = layer; // Assign layer to the object
+
+                        layer.on('click', function() {
+                            console.log(`Map click detected on zone: ${zoneId}`); // Log map click
+                            document.getElementById('zone-id').value = zoneId;
+                            // Highlight with a simple selection style only
+                            highlightZone(zoneId);
+                        });
+
+                        // Add popup safely
+                        const zoneName = feature.properties.zone_name || 'N/A';
+                        layer.bindPopup(`<strong>Zone ${zoneId}</strong><br>${zoneName}`);
+                    } else {
+                         console.warn("Skipping feature due to missing properties or zone_id:", feature);
+                    }
+                }
+            }).addTo(map);
+            console.log("Finished adding GeoJSON layer to map. zonePolygons keys:", Object.keys(zonePolygons)); // Log completion and keys
+        } catch (geojsonError) {
+             console.error("Error processing GeoJSON data:", geojsonError); // Log errors during GeoJSON processing
+        }
     }
 
+    // Revert highlightZone to only handle selection/deselection with a fixed color
     function highlightZone(zoneId) {
-        // Reset previously selected zone
+        console.log(`highlightZone called for zoneId: ${zoneId}`); // Log entry
+
+        // Reset previously selected zone to default grey
         if (selectedZone && zonePolygons[selectedZone]) {
+            console.log(`Resetting style for previous zone: ${selectedZone}`);
             zonePolygons[selectedZone].setStyle({
-                fillColor: '#aaa',
+                color: '#666',
+                weight: 1,
+                opacity: 0.7,
+                fillColor: '#aaa', // Reset fill to neutral grey
                 fillOpacity: 0.3
             });
+        } else if (selectedZone) {
+             console.log(`Previous zone ${selectedZone} polygon not found in zonePolygons.`);
         }
-        
-        // Highlight new selection
-        if (zonePolygons[zoneId]) {
-            zonePolygons[zoneId].setStyle({
-                fillColor: '#ff3939',
-                fillOpacity: 0.6
-            });
-            zonePolygons[zoneId].bringToFront();
+
+        // Style for simple selection (e.g., yellow/orange)
+        const highlightStyle = {
+            color: '#333', // Darker border
+            weight: 2,
+            opacity: 1.0,
+            fillColor: '#f39c12', // Yellow/Orange for selection indication
+            fillOpacity: 0.6
+        };
+
+        // Apply the determined style
+        const targetPolygon = zonePolygons[zoneId]; // Get polygon reference
+        if (targetPolygon) {
+            console.log(`Applying highlight style to zone: ${zoneId}`, highlightStyle);
+            try {
+                targetPolygon.setStyle(highlightStyle);
+                targetPolygon.bringToFront();
+                console.log(`Successfully applied style to zone: ${zoneId}`);
+            } catch (styleError) {
+                console.error(`Error applying style to zone ${zoneId}:`, styleError); // Log styling errors
+            }
+        } else {
+            console.error(`Polygon not found for zoneId: ${zoneId}. Available zones:`, Object.keys(zonePolygons)); // Log if polygon is missing
         }
-        
-        selectedZone = zoneId;
+
+        selectedZone = zoneId; // Update selectedZone *after* attempting highlight
     }
+
 
     async function getPrediction(zoneId, timestamp) {
         // Show loading state
+        const resultContainer = document.getElementById('prediction-result'); // Get result container
+        // Remove reference to resultCard styling
         document.getElementById('demand-value').textContent = 'Loading...';
-        document.getElementById('prediction-result').classList.remove('hidden');
+        resultContainer.classList.remove('hidden');
         
         // Set the in-progress flag
         isPredictionInProgress = true;
-        
+
         // Store controller reference outside try/catch so we can always clean it up
         let controller = new AbortController();
         let timeoutId = null;
@@ -229,13 +296,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 if (!predictionResponse.ok) {
-                    const errorData = await predictionResponse.json();
-                    throw new Error(errorData.detail || 'Unknown error');
+                    // Try to parse error details, default to status text
+                    let errorDetail = predictionResponse.statusText;
+                    try {
+                        const errorData = await predictionResponse.json();
+                        errorDetail = errorData.detail || JSON.stringify(errorData);
+                    } catch (parseError) {
+                        // Ignore if response body is not JSON or empty
+                        console.warn("Could not parse error response body:", parseError);
+                    }
+                    throw new Error(errorDetail || 'Unknown error'); // Use parsed detail or status text
                 }
-                
+
                 const result = await predictionResponse.json();
                 console.log("Prediction result:", result);
-                
+
                 try {
                     // Update UI with prediction results
                     const demandValue = Math.round(result.demand * 10) / 10;
@@ -247,18 +322,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     const demandCategory = getDemandCategory(demandScore);
                     console.log("Demand category:", demandCategory);
                     
-                    const demandColor = getDemandColor(demandScore);
+                    const demandColor = getDemandColor(demandScore); // Get color based on score
                     console.log("Demand color:", demandColor);
-                    
-                    // Make sure prediction-result container is visible
-                    const resultContainer = document.getElementById('prediction-result');
-                    if (resultContainer) {
-                        resultContainer.classList.remove('hidden');
-                    } else {
-                        console.error("Prediction result container not found");
-                    }
-                    
-                    // Update demand display
+
+                    // Update demand display - Apply color directly to category text
                     const demandElement = document.getElementById('demand-value');
                     if (demandElement) {
                         demandElement.innerHTML = `
@@ -282,6 +349,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     const datetimeElement = document.getElementById('prediction-datetime');
                     if (datetimeElement) datetimeElement.textContent = result.timestamp;
+
+                    // Highlight the zone on the map with simple selection style
+                    highlightZone(zoneId);
+
                 } catch (error) {
                     console.error("Error updating UI with prediction results:", error);
                     alert("Error displaying prediction results. Check console for details.");
@@ -292,11 +363,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         demandElement.textContent = "Error displaying formatted results. Raw value: " + 
                             (result.demand ? result.demand : "unavailable");
                     }
+                    // Highlight zone with simple selection style even if UI update fails
+                    highlightZone(zoneId);
                 }
-                
-                // Highlight the zone on the map
-                highlightZone(zoneId);
-                
+
             } catch (fetchError) {
                 console.error('Fetch error:', fetchError);
                 
@@ -309,7 +379,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Special handling for different types of predictions
                 if (diffDays > 14) {
                     console.log("Using fallback for long-term prediction");
-                    // Generate a mock prediction result for demo purposes
                     handleMockLongTermPrediction(zoneId, timestamp);
                 } else {
                     console.log("Using fallback for short-term prediction");
@@ -404,9 +473,9 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Final adjusted score:", finalScore);
         
         const demandCategory = getDemandCategory(finalScore);
-        const demandColor = getDemandColor(finalScore);
-        
-        // Update UI with our mock prediction
+        const demandColor = getDemandColor(finalScore); // Get color based on score
+
+        // Update UI - Apply color directly to category text
         const demandElement = document.getElementById('demand-value');
         if (demandElement) {
             demandElement.innerHTML = `
@@ -428,8 +497,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const datetimeElement = document.getElementById('prediction-datetime');
         if (datetimeElement) datetimeElement.textContent = timestamp;
-        
-        // Highlight the zone on the map
+
+        // Highlight the zone on the map with simple selection style
         highlightZone(zoneId);
     }
     
@@ -509,9 +578,9 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Short-term final adjusted score:", finalScore);
         
         const demandCategory = getDemandCategory(finalScore);
-        const demandColor = getDemandColor(finalScore);
-        
-        // Update UI with our mock prediction
+        const demandColor = getDemandColor(finalScore); // Get color based on score
+
+        // Update UI - Apply color directly to category text
         const demandElement = document.getElementById('demand-value');
         if (demandElement) {
             demandElement.innerHTML = `
@@ -533,8 +602,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const datetimeElement = document.getElementById('prediction-datetime');
         if (datetimeElement) datetimeElement.textContent = timestamp;
-        
-        // Highlight the zone on the map
+
+        // Highlight the zone on the map with simple selection style
         highlightZone(zoneId);
     }
 

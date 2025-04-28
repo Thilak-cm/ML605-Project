@@ -123,65 +123,68 @@ h2 {
     margin-bottom: 15px;
 }
 
-.map-legend {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-}
-
-.legend-item {
-    display: flex;
-    align-items: center;
-    font-size: 14px;
-}
-
-.color-box {
-    width: 15px;
-    height: 15px;
-    margin-right: 5px;
-    border-radius: 3px;
-}
-
-.selected-zone {
-    background-color: #ff3939;
-}
-
-.high-demand {
-    background-color: #39ff4e;
-}
-
-.low-demand {
-    background-color: #3961ff;
-}
-
 #prediction-result {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px dashed #ccc;
+    margin-top: 25px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: var(--radius);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+
+#prediction-result h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--primary-color);
+    text-align: center;
 }
 
 .result-card {
-    background-color: var(--light-gray);
+    background-color: #fff;
     padding: 15px;
     border-radius: var(--radius);
-    margin-top: 15px;
+    border: 1px solid #ddd; /* Default border */
 }
 
 .result-item {
     display: flex;
     justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid #eee;
 }
 
 .result-item:last-child {
     border-bottom: none;
 }
 
+.result-item span:first-child {
+    color: #555;
+    font-weight: 500;
+}
+
+.result-item span:last-child {
+    font-weight: 600;
+}
+
+#demand-value {
+    text-align: right; /* Align demand value content to the right */
+}
+
+#demand-value .demand-category {
+    display: block; /* Make category take full width */
+    font-size: 1.1em;
+    margin-bottom: 4px;
+}
+
+#demand-value .demand-score {
+    display: block; /* Make score take full width */
+    font-size: 1.3em !important; /* Increase score size */
+    color: #333; /* Darker color for score */
+}
+
+
 .highlight {
-    color: var(--accent-color);
+    color: var(--primary-color);
     font-weight: bold;
-    font-size: 1.2rem;
 }
 
 .hidden {

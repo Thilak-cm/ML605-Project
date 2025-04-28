@@ -55,3 +55,6 @@ clearml.conf
 # OS specific
 .DS_Store
 Thumbs.db 
+
+# venv
+605project/

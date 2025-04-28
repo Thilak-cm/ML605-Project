@@ -1,0 +1,95 @@
+{
+    "name": "my-app-pipeline",
+    "roleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/CodePipelineRole",
+    "artifactStore": {
+        "type": "S3",
+        "location": "my-artifact-msml605-taxi"
+    },
+    "stages": [
+        {
+            "name": "Source",
+            "actions": [
+                {
+                    "name": "GitHubSourceAction",
+                    "actionTypeId": {
+                        "category": "Source",
+                        "owner": "ThirdParty",
+                        "provider": "GitHub",
+                        "version": "1"
+                    },
+                    "runOrder": 1,
+                    "configuration": {
+                        "Branch": "master",
+                        "OAuthToken": "****",
+                        "Owner": "Thilak-cm",
+                        "PollForSourceChanges": "false",
+                        "Repo": "ML605-Project"
+                    },
+                    "outputArtifacts": [
+                        {
+                            "name": "SourceArtifact"
+                        }
+                    ],
+                    "inputArtifacts": [],
+                    "region": "us-east-1"
+                }
+            ]
+        },
+        {
+            "name": "Build",
+            "actions": [
+                {
+                    "name": "DockerPushToECR",
+                    "actionTypeId": {
+                        "category": "Build",
+                        "owner": "AWS",
+                        "provider": "CodeBuild",
+                        "version": "1"
+                    },
+                    "runOrder": 1,
+                    "configuration": {
+                        "ProjectName": "build-backend"
+                    },
+                    "outputArtifacts": [
+                        {
+                            "name": "BuildArtifact"
+                        }
+                    ],
+                    "inputArtifacts": [
+                        {
+                            "name": "SourceArtifact"
+                        }
+                    ],
+                    "region": "us-east-1"
+                }
+            ]
+        },
+        {
+            "name": "deploy",
+            "actions": [
+                {
+                    "name": "ECSdeploy",
+                    "actionTypeId": {
+                        "category": "Build",
+                        "owner": "AWS",
+                        "provider": "CodeBuild",
+                        "version": "1"
+                    },
+                    "runOrder": 1,
+                    "configuration": {
+                        "ProjectName": "deploy"
+                    },
+                    "outputArtifacts": [],
+                    "inputArtifacts": [
+                        {
+                            "name": "BuildArtifact"
+                        }
+                    ],
+                    "region": "us-east-1"
+                }
+            ]
+        }
+    ],
+    "version": 4,
+    "pipelineType": "V2"
+}

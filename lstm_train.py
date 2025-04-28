@@ -38,7 +38,7 @@ class Config:
     DATA_PATH = 'data_from_2024/taxi_demand_dataset.csv'
     MODEL_DIR = 'models'
     SCALER_PATH = 'models/scaler.save'
-    MODEL_PATH = 'models/lstm_taxi_model.h5'
+    MODEL_PATH = 'models/lstm_taxi_model.keras'
     
     # Features
     FEATURES = [
@@ -146,6 +146,7 @@ def main():
     )
     
     # Save model
+    logger.info(f"Saving model to {Config.MODEL_PATH}")
     model.save(Config.MODEL_PATH)
     
     # Evaluate model

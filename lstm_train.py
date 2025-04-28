@@ -1,35 +1,80 @@
+import os
+import logging
+from pathlib import Path
 import pandas as pd
 import numpy as np
+import joblib
+import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
-from keras.models import Sequential
-from keras.layers import LSTM, Dense, Dropout
-from keras.optimizers import Adam
-import os
-import joblib
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 
-# Constants
-SEQUENCE_LENGTH = 24  # 24 hours of historical data
-PREDICTION_LENGTH = 24  # Predict next 24 hours
-SAMPLE_SIZE = 10000  # Number of samples to use for testing
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('lstm_training')
 
-# Features to use
-FEATURES = [
-    'temp', 'feels_like', 'wind_speed', 'rain_1h',
-    'hour_of_day', 'day_of_week', 'is_weekend', 'is_holiday', 'is_rush_hour',
-    'demand_lag_1h', 'demand_lag_24h', 'demand_lag_168h',  # Lag features
-    'demand_rolling_mean_24h', 'demand_rolling_std_24h',  # Rolling statistics
-    'demand_change_1h'  # Change features
-]
+# Configuration
+class Config:
+    SEQUENCE_LENGTH = 24  # 24 hours of historical data
+    PREDICTION_LENGTH = 24  # Predict next 24 hours
+    SAMPLE_SIZE = 10000  # Number of samples to use for testing
+    RANDOM_SEED = 42
+    TEST_SIZE = 0.2
+    BATCH_SIZE = 64
+    EPOCHS = 5
+    LEARNING_RATE = 0.001
+    
+    # Model architecture
+    LSTM_UNITS = [32, 16]
+    DROPOUT_RATE = 0.2
+    
+    # File paths
+    DATA_PATH = 'data_from_2024/taxi_demand_dataset.csv'
+    MODEL_DIR = 'models'
+    SCALER_PATH = 'models/scaler.save'
+    MODEL_PATH = 'models/lstm_taxi_model.h5'
+    
+    # Features
+    FEATURES = [
+        'temp', 'feels_like', 'wind_speed', 'rain_1h',
+        'hour_of_day', 'day_of_week', 'is_weekend', 'is_holiday', 'is_rush_hour',
+        'demand_lag_1h', 'demand_lag_24h', 'demand_lag_168h',  # Lag features
+        'demand_rolling_mean_24h', 'demand_rolling_std_24h',  # Rolling statistics
+        'demand_change_1h'  # Change features
+    ]
+    TARGET = 'demand'
 
-TARGET = 'demand'
+def setup_environment():
+    """Setup environment, ensure required directories exist"""
+    # Set seeds for reproducibility
+    np.random.seed(Config.RANDOM_SEED)
+    tf.random.set_seed(Config.RANDOM_SEED)
+    
+    # Create directories if they don't exist
+    os.makedirs(Config.MODEL_DIR, exist_ok=True)
+    
+    # Set memory growth for GPUs if available
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logger.info(f"Found {len(gpus)} GPU(s), memory growth enabled")
+        except RuntimeError as e:
+            logger.warning(f"GPU memory growth setting failed: {e}")
 
 def load_and_preprocess_data():
     # Load data
     df = pd.read_csv('data_from_2024/taxi_demand_dataset.csv')
     
     # Take a random sample
-    df = df.sample(n=SAMPLE_SIZE, random_state=42)
+    df = df.sample(n=Config.SAMPLE_SIZE, random_state=Config.RANDOM_SEED)
     
     # Convert hour to datetime
     df['timestamp'] = pd.to_datetime(df['hour'])
@@ -39,7 +84,7 @@ def load_and_preprocess_data():
     df = df.sort_index()
     
     # Select features and target
-    data = df[FEATURES + [TARGET]]
+    data = df[Config.FEATURES + [Config.TARGET]]
     
     # Handle any missing values
     data = data.ffill()  # Using ffill() instead of fillna(method='ffill')
@@ -49,7 +94,7 @@ def load_and_preprocess_data():
     scaled_data = scaler.fit_transform(data)
     
     # Save scaler for later use
-    joblib.dump(scaler, 'scaler.save')
+    joblib.dump(scaler, Config.SCALER_PATH)
     
     return scaled_data, scaler
 
@@ -66,7 +111,7 @@ def build_model(input_shape):
         Dropout(0.2),  # Reduced from 0.3
         LSTM(16),  # Reduced from 64
         Dropout(0.2),  # Reduced from 0.3
-        Dense(PREDICTION_LENGTH)
+        Dense(Config.PREDICTION_LENGTH)
     ])
     
     model.compile(
@@ -82,26 +127,26 @@ def main():
     scaled_data, scaler = load_and_preprocess_data()
     
     # Create sequences
-    X, y = create_sequences(scaled_data, SEQUENCE_LENGTH, PREDICTION_LENGTH)
+    X, y = create_sequences(scaled_data, Config.SEQUENCE_LENGTH, Config.PREDICTION_LENGTH)
     
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+        X, y, test_size=Config.TEST_SIZE, random_state=Config.RANDOM_SEED
     )
     
     # Build and train model
-    model = build_model((SEQUENCE_LENGTH, len(FEATURES) + 1))
+    model = build_model((Config.SEQUENCE_LENGTH, len(Config.FEATURES) + 1))
     
     # Train model
     history = model.fit(
         X_train, y_train,
         validation_data=(X_test, y_test),
-        epochs=5,  # Reduced from 50
-        batch_size=64  # Increased from 32 for faster training
+        epochs=Config.EPOCHS,
+        batch_size=Config.BATCH_SIZE
     )
     
     # Save model
-    model.save('models/lstm_taxi_model.h5')
+    model.save(Config.MODEL_PATH)
     
     # Evaluate model
     test_loss, test_mae = model.evaluate(X_test, y_test)

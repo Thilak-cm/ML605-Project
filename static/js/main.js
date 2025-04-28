@@ -162,17 +162,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 try {
                     // Get current timestamp
                     const now = Math.floor(Date.now() / 1000);
-                    const response = await fetch(`/live-features/?zone_id=${zoneId}&dt=${now}`);
+                    const liveFeaturesUrl = `/live-features/?zone_id=${zoneId}&dt=${now}`;
+                    console.log("Fetching live features:", liveFeaturesUrl); // Log the URL
+                    const response = await fetch(liveFeaturesUrl);
                     
                     if (response.ok) {
                         const data = await response.json();
                         requestBody.historical_features = data.features;
+                        console.log("Successfully fetched live features."); // Log success
                     } else {
-                        throw new Error('Failed to fetch historical features');
+                        // Log status if response was received but not ok
+                        console.error(`Failed to fetch historical features: Server responded with status ${response.status}`);
+                        throw new Error(`Server error ${response.status}`);
                     }
                 } catch (error) {
+                    // Log the specific error
                     console.error('Error fetching historical features:', error);
-                    alert('Error fetching historical features. Using mock features.');
+                    // Make alert more informative
+                    alert(`Error fetching live data (${error.message}). This might indicate a server issue. Using mock historical data for prediction.`);
                     // Use mock features in case of error
                     requestBody.historical_features = getMockHistoricalFeatures();
                 }

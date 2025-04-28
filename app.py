@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, timezone
-from lstm_predict import predict_demand_from_features
+from nowcast_predict import predict_demand_from_features
 from forecast_predict import predict_future_demand
 import mock_weather_data
 import pandas as pd

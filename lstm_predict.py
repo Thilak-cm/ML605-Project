@@ -24,7 +24,7 @@ class Config:
     # File paths
     DATA_PATH = 'data_from_2024/taxi_demand_dataset.csv'
     MODEL_DIR = 'models'
-    MODEL_PATH = os.path.join(MODEL_DIR, 'lstm_taxi_model.keras')
+    MODEL_PATH = os.path.join(MODEL_DIR, 'best_lstm_model.keras')
     SCALER_PATH = os.path.join(MODEL_DIR, 'scaler.save')
     
     # Features

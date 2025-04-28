@@ -1,0 +1,16 @@
+# Use official Python image
+FROM python:3.11
+
+# Set the working directory
+WORKDIR /app
+
+# Copy dependencies and install them
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
+
+# Copy project files
+COPY . .
+EXPOSE 8000
+
+# Run FastAPI
+CMD ["fastapi", "run", "app.py"]

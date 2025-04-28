@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy only the training script and requirements
+# COPY lstm_train.py .
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create directories for data and models
+RUN mkdir -p /app/data_from_2024 /app/models && \
+    chmod 777 /app/data_from_2024 /app/models
+
+# Command to run the training script
+CMD ["python", "lstm_train.py"]

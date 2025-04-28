@@ -159,12 +159,25 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // If it's a short-term prediction (less than 14 days), get historical features
             if (diffDays <= 14) {
+                let liveFeaturesController = new AbortController();
+                let liveFeaturesTimeoutId = null;
                 try {
                     // Get current timestamp
                     const now = Math.floor(Date.now() / 1000);
                     const liveFeaturesUrl = `/live-features/?zone_id=${zoneId}&dt=${now}`;
                     console.log("Fetching live features:", liveFeaturesUrl); // Log the URL
-                    const response = await fetch(liveFeaturesUrl);
+
+                    // Add timeout for live features fetch
+                    liveFeaturesTimeoutId = setTimeout(() => {
+                        liveFeaturesController.abort();
+                        console.log("Live features request timed out after 5 seconds");
+                    }, 5000); // 5 second timeout
+
+                    const response = await fetch(liveFeaturesUrl, { signal: liveFeaturesController.signal });
+
+                    // Clear timeout if fetch completes
+                    clearTimeout(liveFeaturesTimeoutId);
+                    liveFeaturesTimeoutId = null;
                     
                     if (response.ok) {
                         const data = await response.json();
@@ -176,6 +189,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         throw new Error(`Server error ${response.status}`);
                     }
                 } catch (error) {
+                    // Clear timeout if it exists and fetch failed/aborted
+                    if (liveFeaturesTimeoutId) clearTimeout(liveFeaturesTimeoutId);
+                    
                     // Log the specific error
                     console.error('Error fetching historical features:', error);
                     // Make alert more informative

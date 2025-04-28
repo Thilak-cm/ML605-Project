@@ -28,8 +28,8 @@ class SimpleTimeSeriesTransformer(nn.Module):
         n_encoder_layers: int = 1,
         n_decoder_layers: int = 1,
         dropout: float = 0.1,
-        input_seq_len: int = 12,
-        output_seq_len: int = 12,
+        input_seq_len: int = 24,
+        output_seq_len: int = 24,
         n_features: int = 1,
         n_static_features: int = 1
     ):
@@ -88,8 +88,11 @@ class SimpleTimeSeriesTransformer(nn.Module):
         memory = self.encoder(src)
         output = self.decoder(tgt, memory, tgt_mask=tgt_mask)
         
-        # Project back to original dimension
-        output = self.output_projection(output)  # [batch, output_seq_len, 1]
+        # Reshape for output projection
+        batch_size, seq_len, d_model = output.shape
+        output = output.reshape(-1, d_model)  # [batch*seq_len, d_model]
+        output = self.output_projection(output)  # [batch*seq_len, 1]
+        output = output.reshape(batch_size, seq_len, 1)  # [batch, seq_len, 1]
         
         return output
 
@@ -107,8 +110,8 @@ class TimeSeriesDataset(Dataset):
         feature_columns: List[str],
         static_columns: List[str],
         target_column: str = 'demand',
-        input_seq_len: int = 12,
-        output_seq_len: int = 12,
+        input_seq_len: int = 24,
+        output_seq_len: int = 24,
         stride: int = 1
     ):
         self.feature_columns = feature_columns
@@ -364,8 +367,8 @@ def train_and_save_model(
     data_path: str = 'data_from_2024/taxi_demand_dataset.csv',
     model_path: str = 'models/transformer_model.pt',
     device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
-    input_seq_len: int = 12,
-    output_seq_len: int = 12,
+    input_seq_len: int = 24,
+    output_seq_len: int = 24,
     min_records_per_zone: int = 100,
     enable_clearml: bool = True
 ) -> None:
@@ -393,6 +396,11 @@ def train_and_save_model(
     # Load data
     print("Loading data...")
     df = pd.read_csv(data_path)
+    # sample rows, but not more than available
+    sample_size = min(500000, len(df))
+    df = df.sample(sample_size)
+    # use only first 50 zones
+    df = df[df['zone_id'] < 50]
     df['hour'] = pd.to_datetime(df['hour'])
     
     print("\nInitial data shape:", df.shape)

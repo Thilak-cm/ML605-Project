@@ -16,6 +16,11 @@ import requests
 import holidays
 from dotenv import load_dotenv
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from fastapi import Request
+
 # Configure logging first
 logging.basicConfig(
     level=logging.INFO,
@@ -47,6 +52,8 @@ if not API_KEY:
 # Dictionary to store zone to coordinate mapping
 data_store = {}
 
+
+
 def load_mapping_data() -> None:
     """
     Load CSV mapping data into a dictionary on startup.
@@ -64,6 +71,14 @@ app = FastAPI(
     contact={"name": "MSML650 Computing Systems for Machine Learning Spring 2025"},
     license_info={"name": "MIT"}
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/ui", response_class=HTMLResponse)
+async def serve_frontend(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.on_event("startup")
 async def startup_event():

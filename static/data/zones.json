@@ -1,0 +1,15 @@
+{
+    "zones": [
+      { "id": 43, "name": "Central Park" },
+      { "id": 237, "name": "Upper East Side South" },
+      { "id": 161, "name": "Midtown Center" },
+      { "id": 162, "name": "Midtown East" },
+      { "id": 230, "name": "Times Sq/Theatre District" },
+      { "id": 48, "name": "Clinton East" },
+      { "id": 100, "name": "Flatiron" },
+      { "id": 163, "name": "Midtown North" },
+      { "id": 170, "name": "Murray Hill" },
+      { "id": 236, "name": "Upper East Side North" },
+      { "id": 239, "name": "Upper West Side South" }
+    ]
+  }

@@ -1,0 +1,86 @@
+.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Taxi Demand Predictor</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚕 NYC Taxi Demand Predictor</h1>
+            <p>Predict taxi demand across New York City zones</p>
+        </header>
+
+        <div class="main-content">
+            <div class="prediction-panel">
+                <h2>Make a Prediction</h2>
+                <form id="prediction-form">
+                    <div class="form-group">
+                        <label for="zone-id">Zone ID:</label>
+                        <select id="zone-id" required>
+                            <option value="">Select a zone</option>
+                            <!-- Zones will be populated by JavaScript -->
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="date">Date:</label>
+                        <input type="date" id="date" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="time">Time:</label>
+                        <input type="time" id="time" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Predict Demand</button>
+                </form>
+
+                <div id="prediction-result" class="hidden">
+                    <h3>Prediction Results</h3>
+                    <div class="result-card">
+                        <div class="result-item">
+                            <span>Predicted Demand:</span>
+                            <span id="demand-value" class="highlight">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span>Model Used:</span>
+                            <span id="model-used">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span>Zone:</span>
+                            <span id="zone-name">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span>Date & Time:</span>
+                            <span id="prediction-datetime">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="map-container">
+                <h2>NYC Taxi Zones</h2>
+                <div id="map"></div>
+                <div class="map-legend">
+                    <span class="legend-item"><span class="color-box selected-zone"></span> Selected Zone</span>
+                    <span class="legend-item"><span class="color-box high-demand"></span> High Demand</span>
+                    <span class="legend-item"><span class="color-box low-demand"></span> Low Demand</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>MSML650 Computing Systems for Machine Learning Spring 2025</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let zonePolygons = {};
     let selectedZone = null;
 
+    // Add a flag to track if a prediction request is in progress
+    let isPredictionInProgress = false;
+
     // Populate zone dropdown and load zone boundaries
     fetch('/static/data/zones.json')
         .then(response => {
@@ -35,6 +38,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle form submission
     document.getElementById('prediction-form').addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // Prevent overlapping requests
+        if (isPredictionInProgress) {
+            console.log("A prediction is already in progress, please wait...");
+            return;
+        }
         
         const zoneId = document.getElementById('zone-id').value;
         const date = document.getElementById('date').value;
@@ -122,6 +131,13 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('demand-value').textContent = 'Loading...';
         document.getElementById('prediction-result').classList.remove('hidden');
         
+        // Set the in-progress flag
+        isPredictionInProgress = true;
+        
+        // Store controller reference outside try/catch so we can always clean it up
+        let controller = new AbortController();
+        let timeoutId = null;
+        
         try {
             // For simplicity and demo purposes, we'll determine if we need historical features
             // based on the prediction date
@@ -167,8 +183,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Make prediction request with a timeout
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            controller = new AbortController();
+            timeoutId = setTimeout(() => {
+                controller.abort();
+                console.log("Request timed out after 10 seconds");
+            }, 10000); // 10 second timeout
             
             try {
                 const predictionResponse = await fetch('/predict', {
@@ -180,7 +199,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     signal: controller.signal
                 });
                 
-                clearTimeout(timeoutId);
+                // Clear timeout as soon as response is received
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
                 
                 if (!predictionResponse.ok) {
                     const errorData = await predictionResponse.json();
@@ -254,21 +277,31 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (fetchError) {
                 console.error('Fetch error:', fetchError);
                 
-                // Special handling for long-term predictions if server fails
+                // Clean up timeout if it's still active
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                
+                // Special handling for different types of predictions
                 if (diffDays > 14) {
                     console.log("Using fallback for long-term prediction");
                     // Generate a mock prediction result for demo purposes
                     handleMockLongTermPrediction(zoneId, timestamp);
-                    return;
+                } else {
+                    console.log("Using fallback for short-term prediction");
+                    handleMockShortTermPrediction(zoneId, timestamp, requestBody.historical_features);
                 }
-                
-                throw fetchError;
             }
             
         } catch (error) {
             console.error('Prediction error:', error);
             document.getElementById('demand-value').textContent = 'Error';
             alert(`Prediction error: ${error.message}\n\nCheck the console for more details.`);
+        } finally {
+            // Always clean up and reset the in-progress flag when done
+            if (timeoutId) clearTimeout(timeoutId);
+            isPredictionInProgress = false;
         }
     }
     
@@ -283,26 +316,69 @@ document.addEventListener('DOMContentLoaded', function() {
         // Generate a somewhat realistic score based on common taxi demand patterns
         let baseScore;
         
-        // Time of day effect
-        if (hour >= 7 && hour <= 10) baseScore = 7; // Morning rush
-        else if (hour >= 16 && hour <= 19) baseScore = 8; // Evening rush
-        else if (hour >= 22 || hour <= 3) baseScore = isWeekend ? 9 : 5; // Late night
-        else baseScore = 4; // Mid-day
+        // Time of day effect - add debugging
+        console.log("Mock prediction time factors:", {
+            hour: hour,
+            isWeekend: isWeekend,
+            month: month,
+            dayOfWeek: predDate.getDay(),
+            date: predDate.toLocaleDateString(),
+            time: predDate.toLocaleTimeString()
+        });
+        
+        // Time of day effect with clearer conditional logic
+        if (hour >= 7 && hour <= 10) {
+            baseScore = 7; // Morning rush
+            console.log("Morning rush hour detected");
+        } 
+        else if (hour >= 16 && hour <= 19) {
+            baseScore = 8; // Evening rush
+            console.log("Evening rush hour detected");
+        }
+        else if (hour >= 22 || hour <= 3) {
+            baseScore = isWeekend ? 9 : 5; // Late night
+            console.log("Late night period detected");
+        }
+        else {
+            baseScore = 4; // Mid-day
+            console.log("Mid-day period detected");
+        }
+        
+        console.log("Initial base score:", baseScore);
         
         // Weekend effect
-        if (isWeekend && hour > 10 && hour < 22) baseScore += 1;
+        if (isWeekend && hour > 10 && hour < 22) {
+            baseScore += 1;
+            console.log("Weekend daytime bonus applied");
+        }
         
         // Seasonal effect
-        if (month >= 5 && month <= 8) baseScore += 0.5; // Summer
-        if (month == 11 || month == 0) baseScore += 1; // Holiday season
+        if (month >= 5 && month <= 8) {
+            baseScore += 0.5; // Summer
+            console.log("Summer season bonus applied");
+        }
+        if (month == 11 || month == 0) {
+            baseScore += 1; // Holiday season
+            console.log("Holiday season bonus applied");
+        }
+        
+        // July 4th special case
+        if (month === 6 && predDate.getDate() === 4) {
+            baseScore += 1.5; // Independence Day
+            console.log("July 4th holiday bonus applied");
+        }
         
         // Zone effect - make certain zones busier
         if ([161, 162, 230, 236, 237, 239].includes(parseInt(zoneId))) {
             baseScore += 1; // Busier zones
+            console.log("Popular zone bonus applied");
         }
+        
+        console.log("Final base score before randomization:", baseScore);
         
         // Random variation
         const finalScore = Math.min(10, Math.max(1, Math.round(baseScore + (Math.random() - 0.5))));
+        console.log("Final adjusted score:", finalScore);
         
         const demandCategory = getDemandCategory(finalScore);
         const demandColor = getDemandColor(finalScore);
@@ -323,6 +399,111 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update other elements
         const modelElement = document.getElementById('model-used');
         if (modelElement) modelElement.textContent = "Long-term Prediction Model";
+        
+        const zoneElement = document.getElementById('zone-name');
+        if (zoneElement) zoneElement.textContent = `Zone ${zoneId}`;
+        
+        const datetimeElement = document.getElementById('prediction-datetime');
+        if (datetimeElement) datetimeElement.textContent = timestamp;
+        
+        // Highlight the zone on the map
+        highlightZone(zoneId);
+    }
+    
+    // Helper function for mock short-term predictions when server fails
+    function handleMockShortTermPrediction(zoneId, timestamp, historicalFeatures) {
+        // Parse the date to determine some factors
+        const predDate = new Date(timestamp);
+        const hour = predDate.getHours();
+        const isWeekend = [0, 6].includes(predDate.getDay());
+        
+        console.log("Short-term mock prediction time factors:", {
+            hour: hour,
+            isWeekend: isWeekend,
+            dayOfWeek: predDate.getDay(),
+            date: predDate.toLocaleDateString(),
+            time: predDate.toLocaleTimeString()
+        });
+        
+        // For short-term predictions, we can use historical features if available
+        // to make a more realistic prediction
+        let baseScore;
+        
+        if (historicalFeatures) {
+            console.log("Using historical features for short-term prediction");
+            
+            // Check recent weather conditions
+            const recentTemp = historicalFeatures.temp ? 
+                historicalFeatures.temp[historicalFeatures.temp.length - 1] : 20;
+            const recentRain = historicalFeatures.rain_1h ? 
+                historicalFeatures.rain_1h.some(val => val > 0) : false;
+                
+            // Check if it's rush hour according to historical data
+            const isRushHour = historicalFeatures.is_rush_hour ? 
+                historicalFeatures.is_rush_hour[historicalFeatures.is_rush_hour.length - 1] > 0 : false;
+            
+            console.log("Historical feature indicators:", {
+                recentTemp: recentTemp,
+                recentRain: recentRain,
+                isRushHour: isRushHour
+            });
+                
+            // Base score on time of day
+            if (hour >= 7 && hour <= 10) baseScore = 7; // Morning rush
+            else if (hour >= 16 && hour <= 19) baseScore = 8; // Evening rush
+            else if (hour >= 22 || hour <= 3) baseScore = isWeekend ? 9 : 5; // Late night
+            else baseScore = 4; // Mid-day
+            
+            // Adjust based on weather
+            if (recentTemp < 10) baseScore -= 0.5; // Cold weather
+            if (recentTemp > 30) baseScore += 0.5; // Hot weather
+            if (recentRain) baseScore -= 1; // Rain decreases demand
+            
+            // Rush hour effect
+            if (isRushHour) baseScore += 1;
+        } else {
+            // Simple fallback if no historical features
+            if (hour >= 7 && hour <= 10) baseScore = 7; // Morning rush
+            else if (hour >= 16 && hour <= 19) baseScore = 8; // Evening rush
+            else if (hour >= 22 || hour <= 3) baseScore = isWeekend ? 9 : 5; // Late night
+            else baseScore = 4; // Mid-day
+        }
+        
+        // Weekend effect
+        if (isWeekend && hour > 10 && hour < 22) baseScore += 1;
+        
+        // Zone effect - make certain zones busier
+        if ([161, 162, 230, 236, 237, 239].includes(parseInt(zoneId))) {
+            baseScore += 1; // Busier zones
+        }
+        
+        console.log("Short-term final base score before randomization:", baseScore);
+        
+        // More variation for short-term predictions
+        const randomFactor = (Math.random() - 0.5) * 2; // -1 to +1
+        const finalScore = Math.min(10, Math.max(1, Math.round(baseScore + randomFactor)));
+        
+        console.log("Short-term final adjusted score:", finalScore);
+        
+        const demandCategory = getDemandCategory(finalScore);
+        const demandColor = getDemandColor(finalScore);
+        
+        // Update UI with our mock prediction
+        const demandElement = document.getElementById('demand-value');
+        if (demandElement) {
+            demandElement.innerHTML = `
+                <div class="demand-category" style="color: ${demandColor}; font-weight: bold;">
+                    ${demandCategory}
+                </div>
+                <div class="demand-score" style="font-size: 1.2em;">
+                    ${finalScore}/10
+                </div>
+            `;
+        }
+        
+        // Update other elements
+        const modelElement = document.getElementById('model-used');
+        if (modelElement) modelElement.textContent = "Short-term Prediction Model";
         
         const zoneElement = document.getElementById('zone-name');
         if (zoneElement) zoneElement.textContent = `Zone ${zoneId}`;

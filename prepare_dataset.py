@@ -5,7 +5,7 @@ from tqdm import tqdm
 import holidays
 import os
 
-def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
+def load_and_preprocess_weather(weather_file: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
     Load and preprocess weather data.
     """
@@ -14,6 +14,9 @@ def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
     
     # Convert timestamp to datetime
     weather_df['dt_iso'] = pd.to_datetime(weather_df['dt_iso'])
+
+    # filter for the certain dates
+    weather_df = weather_df[(weather_df['dt_iso'] >= start_date) & (weather_df['dt_iso'] <= end_date)]
     
     # Round to nearest hour to match with taxi data
     weather_df['hour'] = weather_df['dt_iso'].dt.floor('h')
@@ -29,7 +32,7 @@ def load_and_preprocess_weather(weather_file: str) -> pd.DataFrame:
     
     return weather_df
 
-def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
+def load_and_preprocess_taxi(taxi_file: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
     Load and preprocess taxi data with zone-level demand aggregation.
     """
@@ -38,9 +41,12 @@ def load_and_preprocess_taxi(taxi_file: str) -> pd.DataFrame:
     
     # Convert timestamp to datetime
     taxi_df['tpep_pickup_datetime'] = pd.to_datetime(taxi_df['tpep_pickup_datetime'])
+
+    # filter for the certain dates
+    taxi_df = taxi_df[(taxi_df['tpep_pickup_datetime'] >= start_date) & (taxi_df['tpep_pickup_datetime'] <= end_date)]
     
     # Round to nearest hour
-    taxi_df['hour'] = taxi_df['tpep_pickup_datetime'].dt.floor('H')
+    taxi_df['hour'] = taxi_df['tpep_pickup_datetime'].dt.floor('h')
     
     # Rename PULocationID to zone_id
     taxi_df = taxi_df.rename(columns={'PULocationID': 'zone_id'})
@@ -176,13 +182,13 @@ def add_lagged_features(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def merge_data(taxi_file: str, weather_file: str, output_file: str) -> None:
+def merge_data(taxi_file: str, weather_file: str, start_date: str, end_date: str, output_file: str) -> None:
     """
     Merge taxi and weather data, add features, and save to file.
     """
     # Load and preprocess data
-    weather_df = load_and_preprocess_weather(weather_file)
-    demand_df = load_and_preprocess_taxi(taxi_file)
+    weather_df = load_and_preprocess_weather(weather_file, start_date, end_date)
+    demand_df = load_and_preprocess_taxi(taxi_file, start_date, end_date)
     
     print("Merging weather data...")
     # Merge on hour (weather data will be duplicated for each zone)
@@ -241,5 +247,7 @@ if __name__ == "__main__":
     weather_file = "data_from_2024/weather_data.csv"
     output_file = "data_from_2024/taxi_demand_dataset.csv"
     
-    # Merge data
-    merge_data(taxi_file, weather_file, output_file) 
+    # Merge data with a specific time window, just take 2024 to 2025 as an example
+    start_date = "2024-01-01"
+    end_date = "2025-01-01"
+    merge_data(taxi_file, weather_file, start_date, end_date, output_file) 

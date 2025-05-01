@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only the training script and requirements
-# COPY lstm_train.py .
+COPY nowcast_train.py .
 COPY requirements.txt .
 
 # Install dependencies

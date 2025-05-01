@@ -243,7 +243,7 @@ def merge_data(taxi_file: str, weather_file: str, start_date: str, end_date: str
 
 if __name__ == "__main__":
     # File paths
-    taxi_file = "data_from_2024/cleaned_taxi_data_short.csv"
+    taxi_file = "data_from_2024/cleaned_taxi_data.csv"
     weather_file = "data_from_2024/weather_data.csv"
     output_file = "data_from_2024/taxi_demand_dataset.csv"
     

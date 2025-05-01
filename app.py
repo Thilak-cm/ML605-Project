@@ -7,7 +7,6 @@ from forecast_predict import predict_future_demand
 import mock_weather_data
 import pandas as pd
 import logging
-import traceback # Make sure traceback is imported
 import sys
 import csv
 import os
@@ -21,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi import Request
 
-# Configure logging first (already present and looks good)
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -47,7 +46,6 @@ logger.info("API_KEY from env: %s", os.getenv('api_key'))
 API_KEY = os.getenv('api_key')
 if not API_KEY:
     logger.error("OpenWeather API key not found! Please set 'api_key' in .env file")
-    # Don't raise error here to allow mock data to work
 
 # Dictionary to store zone to coordinate mapping
 data_store = {}
@@ -104,8 +102,7 @@ async def serve_frontend(request: Request):
     """Serves the main frontend UI at the root path"""
     return templates.TemplateResponse("index.html", {"request": request})
 
-# Moved UI endpoint to root and renamed this to health check
-@app.get("/health")
+@app.get("/health") 
 async def health_check():
     """API health check endpoint."""
     return {
@@ -162,8 +159,20 @@ def extract_weather_data(weather_data):
         "day_of_week": [],
         "is_weekend": [],
         "is_holiday": [],
-        "is_rush_hour": []
+        "is_rush_hour": [],
+        # New features for enhanced model
+        "is_morning_rush": [],
+        "is_evening_rush": [],
+        "is_morning": [],
+        "is_afternoon": [],
+        "is_evening": [],
+        "is_night": []
     }
+    
+    # Day of week one-hot encoding
+    for i in range(7):
+        features[f"day_{i}"] = []
+    
     for weather in weather_data:
         # Extract information
         timestamp_fmt = datetime.fromtimestamp(float(weather["data"][0]["dt"]), tz=timezone.utc)
@@ -175,6 +184,7 @@ def extract_weather_data(weather_data):
         us_holidays = holidays.US()
         is_holiday = timestamp_fmt.date() in us_holidays
 
+        # Basic features
         features["temp"].append(float(weather["data"][0]["temp"]))
         features["feels_like"].append(float(weather["data"][0]["feels_like"]))
         features["wind_speed"].append(float(weather["data"][0]["wind_speed"]))
@@ -185,9 +195,26 @@ def extract_weather_data(weather_data):
         features["day_of_week"].append(float(day_of_week))
         features["is_weekend"].append(float(is_weekend))
         features["is_holiday"].append(float(is_holiday))
+        
+        # Rush hour features
         # Morning Rush Hour: 7:00 AM – 10:00 AM
         # Evening Rush Hour: 4:00 PM – 7:00 PM
-        features["is_rush_hour"].append(1 if (hour_of_day >= 7 and hour_of_day <= 10) or (hour_of_day >= 16 and hour_of_day <= 19) else 0)
+        is_rush_hour = 1 if (hour_of_day >= 7 and hour_of_day <= 10) or (hour_of_day >= 16 and hour_of_day <= 19) else 0
+        features["is_rush_hour"].append(float(is_rush_hour))
+        
+        # New segmented rush hour features
+        features["is_morning_rush"].append(float(1 if hour_of_day >= 7 and hour_of_day <= 9 else 0))
+        features["is_evening_rush"].append(float(1 if hour_of_day >= 16 and hour_of_day <= 19 else 0))
+        
+        # Day period features
+        features["is_morning"].append(float(1 if hour_of_day >= 6 and hour_of_day <= 11 else 0))
+        features["is_afternoon"].append(float(1 if hour_of_day >= 12 and hour_of_day <= 17 else 0))
+        features["is_evening"].append(float(1 if hour_of_day >= 18 and hour_of_day <= 23 else 0))
+        features["is_night"].append(float(1 if hour_of_day >= 0 and hour_of_day <= 5 else 0))
+        
+        # One-hot encoding for day of week
+        for i in range(7):
+            features[f"day_{i}"].append(float(1 if day_of_week == i else 0))
 
     return features
 
@@ -233,8 +260,26 @@ def validate_historical_features(features: Dict[str, List[float]]) -> None:
         ValueError: If features are invalid or missing
     """
     required_features = {
+        # Basic weather features
         'temp', 'feels_like', 'wind_speed', 'rain_1h',
+        
+        # Time features
         'hour_of_day', 'day_of_week', 'is_weekend', 'is_holiday', 'is_rush_hour',
+        
+        # Enhanced time features
+        'is_morning_rush', 'is_evening_rush',
+        'is_morning', 'is_afternoon', 'is_evening', 'is_night',
+        
+        # Day of week one-hot encoding
+        'day_0', 'day_1', 'day_2', 'day_3', 'day_4', 'day_5', 'day_6',
+        
+        # Zone interactions
+        'zone_hour_interaction', 'zone_day_interaction',
+        
+        # Weather conditions
+        'is_cold', 'is_hot', 'rain_rush_interaction',
+        
+        # LSTM specific features
         'demand_lag_1h', 'demand_lag_24h', 'demand_lag_168h',  # Lag features
         'demand_rolling_mean_24h', 'demand_rolling_std_24h',  # Rolling statistics
         'demand_change_1h'  # Change features
@@ -528,6 +573,17 @@ async def live_features(zone_id: int, dt: int = None, mock: bool = True):
                 base_features[feature].extend([base_features[feature][-1]] * (24 - len(base_features[feature])))
             elif len(base_features[feature]) > 24:
                 base_features[feature] = base_features[feature][:24]
+        
+        # Add zone interaction features necessary for the improved model
+        base_features["zone_hour_interaction"] = [zone_id * h for h in base_features["hour_of_day"]]
+        base_features["zone_day_interaction"] = [zone_id * d for d in base_features["day_of_week"]]
+        
+        # Add weather condition features
+        base_features["is_cold"] = [float(1 if t < 40 else 0) for t in base_features["temp"]]
+        base_features["is_hot"] = [float(1 if t > 80 else 0) for t in base_features["temp"]]
+        
+        # Add weather-rush hour interaction
+        base_features["rain_rush_interaction"] = [r * rh for r, rh in zip(base_features["rain_1h"], base_features["is_rush_hour"])]
 
         return LiveFeaturesResponse(
             lat=str(lat),
@@ -560,6 +616,24 @@ async def live_features(zone_id: int, dt: int = None, mock: bool = True):
         base_features["demand_rolling_std_24h"] = [0.2] * len(base_features["temp"])
         base_features["demand_change_1h"] = [0.0] * len(base_features["temp"])
         
+        # Ensure all features have exactly 24 hours of data
+        for feature in base_features:
+            if len(base_features[feature]) < 24:
+                base_features[feature].extend([base_features[feature][-1]] * (24 - len(base_features[feature])))
+            elif len(base_features[feature]) > 24:
+                base_features[feature] = base_features[feature][:24]
+        
+        # Add zone interaction features necessary for the improved model
+        base_features["zone_hour_interaction"] = [zone_id * h for h in base_features["hour_of_day"]]
+        base_features["zone_day_interaction"] = [zone_id * d for d in base_features["day_of_week"]]
+        
+        # Add weather condition features
+        base_features["is_cold"] = [float(1 if t < 40 else 0) for t in base_features["temp"]]
+        base_features["is_hot"] = [float(1 if t > 80 else 0) for t in base_features["temp"]]
+        
+        # Add weather-rush hour interaction
+        base_features["rain_rush_interaction"] = [r * rh for r, rh in zip(base_features["rain_1h"], base_features["is_rush_hour"])]
+
         return LiveFeaturesResponse(
             lat=str(lat),
             long=str(long),

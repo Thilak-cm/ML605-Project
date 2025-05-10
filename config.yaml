@@ -1,0 +1,61 @@
+# Data Configuration
+data:
+  path: 'data_from_2024/taxi_demand_dataset.csv'
+  sample_size: 500000
+  max_zones: 20
+  min_records_per_zone: 100
+
+# Model Architecture
+model:
+  d_model:
+    min: 8
+    max: 32
+  n_heads:
+    min: 2
+    max: 4
+  n_encoder_layers:
+    min: 1
+    max: 4
+  n_decoder_layers:
+    min: 1
+    max: 4
+  dropout:
+    min: 0.1
+    max: 0.5
+  input_seq_len: [12, 24, 48]
+  output_seq_len: [12, 24]
+
+# Training Configuration
+training:
+  learning_rate:
+    min: '0.0001'  # 1e-4 in decimal form
+    max: '0.01'    # 1e-2 in decimal form
+    log: true
+  batch_size: [16, 32, 64]
+  max_epochs: 20
+  patience: 3
+  device: 'cpu'  # Options: 'cuda' (if available) or 'cpu'
+
+# Optimization Configuration
+optimization:
+  n_trials: 30
+  timeout_per_trial: 3000  # 5 minutes
+  n_startup_trials: 2
+  n_warmup_steps: 5
+  enable_clearml: false
+
+# Feature Configuration
+features:
+  dynamic:
+    - temp
+    - feels_like
+    - wind_speed
+    - rain_1h
+    - hour_of_day
+    - day_of_week
+    - is_weekend
+    - is_holiday
+    - is_rush_hour
+  static:
+    - zone_id
+  target: demand 

@@ -1,0 +1,40 @@
+2025-05-10 11:37:01,081 - transformer_training - INFO - Logging initialized. Log file: logs/transformer_training_20250510_113701.log
+2025-05-10 11:37:01,081 - transformer_training - INFO - Loading configuration...
+2025-05-10 11:37:01,083 - transformer_training - INFO - 
+Running hyperparameter optimization...
+2025-05-10 11:37:01,083 - transformer_training - INFO - Starting hyperparameter optimization with 30 trials...
+2025-05-10 11:37:01,083 - transformer_training - INFO - Each trial will run for up to 20 epochs with early stopping (patience=3)
+2025-05-10 11:37:01,083 - transformer_training - INFO - Loading and preprocessing data...
+2025-05-10 11:37:06,386 - transformer_training - INFO - Data loaded. Shape: (1215964, 71)
+2025-05-10 11:37:06,386 - transformer_training - INFO - Using stratified sampling for hyperparameter optimization...
+2025-05-10 11:37:06,927 - transformer_training - INFO - After stratified sampling:
+2025-05-10 11:37:06,927 - transformer_training - INFO - - Total records: 243061
+2025-05-10 11:37:06,929 - transformer_training - INFO - - Number of zones: 246
+2025-05-10 11:37:06,933 - transformer_training - INFO - - Records per zone (min): 21
+2025-05-10 11:37:06,936 - transformer_training - INFO - - Records per zone (max): 2000
+2025-05-10 11:37:06,939 - transformer_training - INFO - - Records per zone (mean): 988.05
+2025-05-10 11:37:06,939 - transformer_training - INFO - Converting hour column to datetime...
+2025-05-10 11:37:06,991 - transformer_training - INFO - Scaling features...
+2025-05-10 11:37:07,082 - transformer_training - INFO - Data split sizes:
+2025-05-10 11:37:07,083 - transformer_training - INFO - Train: 194475 records, 246 zones
+2025-05-10 11:37:07,083 - transformer_training - INFO - Val: 24309 records, 246 zones
+2025-05-10 11:37:07,085 - transformer_training - INFO - Adjusted timeout per trial: 5834 seconds (based on data size)
+2025-05-10 11:37:07,085 - transformer_training - INFO - 
+===== Starting Optuna Optimization Loop =====
+2025-05-10 11:37:07,086 - transformer_training - INFO - 
+========== Starting Trial 0 ==========
+2025-05-10 11:37:07,086 - transformer_training - INFO - 
+Starting Trial 0
+2025-05-10 11:37:07,087 - transformer_training - INFO - Memory usage at start: 934.47 MB
+2025-05-10 11:37:07,087 - transformer_training - INFO - Using device: cpu
+2025-05-10 11:37:07,088 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 11:37:07,088 - transformer_training - INFO -   d_model: 16
+2025-05-10 11:37:07,088 - transformer_training - INFO -   n_heads: 4
+2025-05-10 11:37:07,088 - transformer_training - INFO -   n_encoder_layers: 3
+2025-05-10 11:37:07,088 - transformer_training - INFO -   n_decoder_layers: 2
+2025-05-10 11:37:07,088 - transformer_training - INFO -   dropout: 0.26647465279834537
+2025-05-10 11:37:07,088 - transformer_training - INFO -   learning_rate: 0.00046141518649761825
+2025-05-10 11:37:07,088 - transformer_training - INFO -   batch_size: 16
+2025-05-10 11:37:07,088 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 11:37:07,088 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 11:37:07,088 - transformer_training - INFO - Creating datasets...

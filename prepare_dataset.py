@@ -249,5 +249,5 @@ if __name__ == "__main__":
     
     # Merge data with a specific time window, just take 2024 to 2025 as an example
     start_date = "2024-01-01"
-    end_date = "2025-01-01"
+    end_date = "2024-03-01"
     merge_data(taxi_file, weather_file, start_date, end_date, output_file) 

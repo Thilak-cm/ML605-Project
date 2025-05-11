@@ -429,7 +429,7 @@ async def predict(request: PredictionRequest) -> PredictionResponse:
 
 
 @app.get("/live-features/")
-async def live_features(zone_id: int, dt: int = None, mock: bool = True):
+async def live_features(zone_id: int, dt: int = None, mock: bool = False):
     """
     This function retrieves live weather features for a specified zone.
     It performs validation checks on the zone ID and timestamp, fetches 

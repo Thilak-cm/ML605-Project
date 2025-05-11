@@ -79,6 +79,7 @@ def load_and_preprocess_taxi(taxi_file: str, start_date: str, end_date: str) -> 
     
     # 1. Log transform (safe to use as it's a point-wise operation)
     demand_df['demand_log'] = np.log1p(demand_df['demand'])
+    print("demand log is created!! tacos 1")
     
     # 2. Rolling z-score normalization (using only historical data)
     window_size = 168  # 1 week
@@ -149,6 +150,7 @@ def add_lagged_features(df: pd.DataFrame) -> pd.DataFrame:
     # Group by zone for zone-specific calculations
     grouped = df.groupby('zone_id')
     
+    print("grouped is created!! tacos 3")
     # Add lagged features for both raw and normalized demand
     for lag in [1, 3, 24, 168]:  # 1 hour, 3 hours, 1 day, 1 week
         # Raw demand lags
@@ -189,6 +191,7 @@ def merge_data(taxi_file: str, weather_file: str, start_date: str, end_date: str
     # Load and preprocess data
     weather_df = load_and_preprocess_weather(weather_file, start_date, end_date)
     demand_df = load_and_preprocess_taxi(taxi_file, start_date, end_date)
+    print("demand_df is created!! tacos 2")
     
     print("Merging weather data...")
     # Merge on hour (weather data will be duplicated for each zone)

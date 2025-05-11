@@ -69,6 +69,7 @@ def test_add_lagged_features(sample_demand_df):
     """Test that lagged features are correctly added."""
     try:
         # Apply the function
+        sample_demand_df['demand_log'] = np.log1p(sample_demand_df['demand'])
         result_df = add_lagged_features(sample_demand_df)
         
         # Check that new columns were added

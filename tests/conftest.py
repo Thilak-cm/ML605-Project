@@ -1,9 +1,13 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pytest
 import pandas as pd
 import numpy as np
-import os
 import tempfile
 from pathlib import Path
+from fastapi.testclient import TestClient
 
 @pytest.fixture(scope="session")
 def test_data_path():
@@ -54,9 +58,8 @@ def sample_test_file():
 @pytest.fixture(scope="session")
 def mock_api_client():
     """Fixture to provide a mock API client for testing API endpoints."""
-    from fastapi.testclient import TestClient
     try:
         from app import app
         return TestClient(app)
     except ImportError:
-        pytest.skip("FastAPI not installed or app.py not found") 
+        pytest.skip("FastAPI not installed or app.py not found")

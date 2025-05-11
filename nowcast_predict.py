@@ -234,7 +234,7 @@ def predict_demand(model, scaler, input_data: np.ndarray) -> np.ndarray:
     # Create a dummy array with the same shape as the original data
     dummy = np.zeros((scaled_predictions.shape[1], scaler.n_features_in_))
     # Put the predictions in the last column (demand)
-    dummy[:, -1] = scaled_predictions[0]
+    dummy[:, -1] = scaled_predictions[0].reshape(-1)  # Reshape to (24,)
     # Inverse transform
     predictions = scaler.inverse_transform(dummy)[:, -1]
     

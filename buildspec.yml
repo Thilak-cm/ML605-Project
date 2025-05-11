@@ -1,0 +1,62 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade pip
+      - pip install -r requirements.txt
+      - pip install pytest pytest-cov pytest-xdist flake8 pytest-html
+
+  pre_build:
+    commands:
+      - echo "Running linting and static analysis..."
+      - flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+      - echo "Running tests..."
+      - mkdir -p test-reports
+
+  build:
+    commands:
+      - echo "Building Docker images..."
+      - docker build -t taxi-demand-dataprep -f Dockerfile.datapreparing .
+      - docker build -t taxi-demand-lstm -f Dockerfile.lstm .
+      - docker build -t taxi-demand-transformer -f Dockerfile.transformer .
+      - docker build -t taxi-demand-xgbr -f Dockerfile.xgbr .
+      - docker build -t taxi-demand-backend -f Dockerfile.backend .
+
+  post_build:
+    commands:
+      - echo "Running test suite..."
+      - pytest tests/test_data/ -v --junitxml=test-reports/data-test-results.xml
+      - pytest tests/test_api/ -v --junitxml=test-reports/api-test-results.xml
+      - pytest tests/test_models/ -v --junitxml=test-reports/model-test-results.xml
+      - pytest tests/test_integration/ -v --junitxml=test-reports/integration-test-results.xml
+      - pytest tests/test_utils/ -v --junitxml=test-reports/utils-test-results.xml
+      - pytest --cov=. --cov-report=xml:test-reports/coverage.xml
+      - pytest --html=test-reports/report.html --self-contained-html
+      - echo "Tests completed on `date`"
+
+reports:
+  test-reports:
+    files:
+      - test-reports/*.xml
+    file-format: JunitXml
+  coverage-reports:
+    files:
+      - test-reports/coverage.xml
+    file-format: CoberturaXml
+
+artifacts:
+  files:
+    - test-reports/**/*
+    - appspec.yml
+    - Dockerfile.*
+    - requirements.txt
+    - '**/*.py'
+    - models/**/*
+    - templates/**/*
+    - static/**/*
+    - config.yaml
+  discard-paths: no 

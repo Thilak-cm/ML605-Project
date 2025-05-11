@@ -38,3 +38,438 @@ Starting Trial 0
 2025-05-10 11:37:07,088 - transformer_training - INFO -   input_seq_len: 24
 2025-05-10 11:37:07,088 - transformer_training - INFO -   output_seq_len: 12
 2025-05-10 11:37:07,088 - transformer_training - INFO - Creating datasets...
+2025-05-10 11:38:20,351 - transformer_training - INFO - Created datasets with 185975 training sequences and 16615 validation sequences
+2025-05-10 11:38:20,355 - transformer_training - INFO - Initializing model...
+2025-05-10 11:38:20,378 - transformer_training - INFO - Starting model training...
+2025-05-10 11:55:02,260 - transformer_training - INFO - Trial 0 completed. Best validation loss: 7954.2519
+2025-05-10 11:55:03,564 - transformer_training - INFO - ========== Trial 0 Complete ==========
+2025-05-10 11:55:03,564 - transformer_training - INFO - Progress: 1/30 trials completed
+
+2025-05-10 11:55:03,635 - transformer_training - INFO - 
+========== Starting Trial 1 ==========
+2025-05-10 11:55:03,635 - transformer_training - INFO - 
+Starting Trial 1
+2025-05-10 11:55:03,636 - transformer_training - INFO - Memory usage at start: 560.03 MB
+2025-05-10 11:55:03,637 - transformer_training - INFO - Using device: cpu
+2025-05-10 11:55:03,642 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 11:55:03,642 - transformer_training - INFO -   d_model: 27
+2025-05-10 11:55:03,642 - transformer_training - INFO -   n_heads: 3
+2025-05-10 11:55:03,642 - transformer_training - INFO -   n_encoder_layers: 4
+2025-05-10 11:55:03,642 - transformer_training - INFO -   n_decoder_layers: 4
+2025-05-10 11:55:03,642 - transformer_training - INFO -   dropout: 0.46377366902563577
+2025-05-10 11:55:03,642 - transformer_training - INFO -   learning_rate: 0.00013552830131731064
+2025-05-10 11:55:03,642 - transformer_training - INFO -   batch_size: 16
+2025-05-10 11:55:03,642 - transformer_training - INFO -   input_seq_len: 48
+2025-05-10 11:55:03,642 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 11:55:03,642 - transformer_training - INFO - Creating datasets...
+2025-05-10 11:56:10,271 - transformer_training - INFO - Created datasets with 180408 training sequences and 12284 validation sequences
+2025-05-10 11:56:10,274 - transformer_training - INFO - Initializing model...
+2025-05-10 11:56:10,285 - transformer_training - INFO - Starting model training...
+2025-05-10 13:29:40,612 - transformer_training - INFO - Trial 1 completed. Best validation loss: 8823.1042
+2025-05-10 13:29:42,067 - transformer_training - INFO - ========== Trial 1 Complete ==========
+2025-05-10 13:29:42,067 - transformer_training - INFO - Progress: 2/30 trials completed
+
+2025-05-10 13:29:42,135 - transformer_training - INFO - 
+========== Starting Trial 2 ==========
+2025-05-10 13:29:42,135 - transformer_training - INFO - 
+Starting Trial 2
+2025-05-10 13:29:42,136 - transformer_training - INFO - Memory usage at start: 902.70 MB
+2025-05-10 13:29:42,136 - transformer_training - INFO - Using device: cpu
+2025-05-10 13:29:42,143 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 13:29:42,143 - transformer_training - INFO -   d_model: 8
+2025-05-10 13:29:42,143 - transformer_training - INFO -   n_heads: 4
+2025-05-10 13:29:42,143 - transformer_training - INFO -   n_encoder_layers: 1
+2025-05-10 13:29:42,143 - transformer_training - INFO -   n_decoder_layers: 1
+2025-05-10 13:29:42,143 - transformer_training - INFO -   dropout: 0.16302042463946936
+2025-05-10 13:29:42,143 - transformer_training - INFO -   learning_rate: 0.00012342386789056565
+2025-05-10 13:29:42,143 - transformer_training - INFO -   batch_size: 64
+2025-05-10 13:29:42,143 - transformer_training - INFO -   input_seq_len: 48
+2025-05-10 13:29:42,143 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 13:29:42,143 - transformer_training - INFO - Creating datasets...
+2025-05-10 13:30:49,399 - transformer_training - INFO - Created datasets with 180408 training sequences and 12284 validation sequences
+2025-05-10 13:30:49,402 - transformer_training - INFO - Initializing model...
+2025-05-10 13:30:49,407 - transformer_training - INFO - Starting model training...
+2025-05-10 13:43:07,717 - transformer_training - INFO - Trial 2 completed. Best validation loss: 8857.6262
+2025-05-10 13:43:08,568 - transformer_training - INFO - ========== Trial 2 Complete ==========
+2025-05-10 13:43:08,569 - transformer_training - INFO - Progress: 3/30 trials completed
+
+2025-05-10 13:43:08,631 - transformer_training - INFO - 
+========== Starting Trial 3 ==========
+2025-05-10 13:43:08,631 - transformer_training - INFO - 
+Starting Trial 3
+2025-05-10 13:43:08,632 - transformer_training - INFO - Memory usage at start: 1006.92 MB
+2025-05-10 13:43:08,632 - transformer_training - INFO - Using device: cpu
+2025-05-10 13:43:08,638 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 13:43:08,638 - transformer_training - INFO -   d_model: 12
+2025-05-10 13:43:08,638 - transformer_training - INFO -   n_heads: 2
+2025-05-10 13:43:08,638 - transformer_training - INFO -   n_encoder_layers: 4
+2025-05-10 13:43:08,638 - transformer_training - INFO -   n_decoder_layers: 4
+2025-05-10 13:43:08,638 - transformer_training - INFO -   dropout: 0.49495492337741553
+2025-05-10 13:43:08,638 - transformer_training - INFO -   learning_rate: 0.009141177291520182
+2025-05-10 13:43:08,638 - transformer_training - INFO -   batch_size: 64
+2025-05-10 13:43:08,638 - transformer_training - INFO -   input_seq_len: 12
+2025-05-10 13:43:08,638 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 13:43:08,638 - transformer_training - INFO - Creating datasets...
+2025-05-10 13:44:21,504 - transformer_training - INFO - Created datasets with 188843 training sequences and 19110 validation sequences
+2025-05-10 13:44:21,506 - transformer_training - INFO - Initializing model...
+2025-05-10 13:44:21,513 - transformer_training - INFO - Starting model training...
+2025-05-10 13:52:12,153 - transformer_training - INFO - Trial 3 completed. Best validation loss: 8100.1643
+2025-05-10 13:52:13,509 - transformer_training - INFO - ========== Trial 3 Complete ==========
+2025-05-10 13:52:13,509 - transformer_training - INFO - Progress: 4/30 trials completed
+
+2025-05-10 13:52:13,594 - transformer_training - INFO - 
+========== Starting Trial 4 ==========
+2025-05-10 13:52:13,594 - transformer_training - INFO - 
+Starting Trial 4
+2025-05-10 13:52:13,595 - transformer_training - INFO - Memory usage at start: 642.91 MB
+2025-05-10 13:52:13,595 - transformer_training - INFO - Using device: cpu
+2025-05-10 13:52:13,600 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 13:52:13,601 - transformer_training - INFO -   d_model: 30
+2025-05-10 13:52:13,601 - transformer_training - INFO -   n_heads: 3
+2025-05-10 13:52:13,601 - transformer_training - INFO -   n_encoder_layers: 3
+2025-05-10 13:52:13,601 - transformer_training - INFO -   n_decoder_layers: 4
+2025-05-10 13:52:13,601 - transformer_training - INFO -   dropout: 0.17735581991049246
+2025-05-10 13:52:13,601 - transformer_training - INFO -   learning_rate: 0.00022939891073844618
+2025-05-10 13:52:13,601 - transformer_training - INFO -   batch_size: 64
+2025-05-10 13:52:13,601 - transformer_training - INFO -   input_seq_len: 12
+2025-05-10 13:52:13,601 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 13:52:13,601 - transformer_training - INFO - Creating datasets...
+2025-05-10 13:54:18,388 - transformer_training - INFO - Created datasets with 188843 training sequences and 19110 validation sequences
+2025-05-10 13:54:18,391 - transformer_training - INFO - Initializing model...
+2025-05-10 13:54:18,403 - transformer_training - INFO - Starting model training...
+2025-05-10 14:26:09,978 - transformer_training - INFO - Trial 4 completed. Best validation loss: 7744.4414
+2025-05-10 14:26:11,871 - transformer_training - INFO - ========== Trial 4 Complete ==========
+2025-05-10 14:26:11,871 - transformer_training - INFO - Progress: 5/30 trials completed
+
+2025-05-10 14:26:11,949 - transformer_training - INFO - 
+========== Starting Trial 5 ==========
+2025-05-10 14:26:11,950 - transformer_training - INFO - 
+Starting Trial 5
+2025-05-10 14:26:11,951 - transformer_training - INFO - Memory usage at start: 654.73 MB
+2025-05-10 14:26:11,952 - transformer_training - INFO - Using device: cpu
+2025-05-10 14:26:11,956 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 14:26:11,957 - transformer_training - INFO -   d_model: 27
+2025-05-10 14:26:11,957 - transformer_training - INFO -   n_heads: 3
+2025-05-10 14:26:11,957 - transformer_training - INFO -   n_encoder_layers: 3
+2025-05-10 14:26:11,957 - transformer_training - INFO -   n_decoder_layers: 1
+2025-05-10 14:26:11,957 - transformer_training - INFO -   dropout: 0.14868346048934772
+2025-05-10 14:26:11,957 - transformer_training - INFO -   learning_rate: 0.001594714276078732
+2025-05-10 14:26:11,957 - transformer_training - INFO -   batch_size: 32
+2025-05-10 14:26:11,957 - transformer_training - INFO -   input_seq_len: 48
+2025-05-10 14:26:11,957 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 14:26:11,957 - transformer_training - INFO - Creating datasets...
+2025-05-10 14:28:11,479 - transformer_training - INFO - Created datasets with 177682 training sequences and 10522 validation sequences
+2025-05-10 14:28:11,487 - transformer_training - INFO - Initializing model...
+2025-05-10 14:28:11,529 - transformer_training - INFO - Starting model training...
+2025-05-10 15:24:24,429 - transformer_training - INFO - Trial 5 completed. Best validation loss: 7360.2421
+2025-05-10 15:24:26,881 - transformer_training - INFO - ========== Trial 5 Complete ==========
+2025-05-10 15:24:26,881 - transformer_training - INFO - Progress: 6/30 trials completed
+
+2025-05-10 15:24:26,984 - transformer_training - INFO - 
+========== Starting Trial 6 ==========
+2025-05-10 15:24:26,984 - transformer_training - INFO - 
+Starting Trial 6
+2025-05-10 15:24:26,985 - transformer_training - INFO - Memory usage at start: 931.23 MB
+2025-05-10 15:24:26,985 - transformer_training - INFO - Using device: cpu
+2025-05-10 15:24:26,997 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 15:24:26,998 - transformer_training - INFO -   d_model: 28
+2025-05-10 15:24:26,998 - transformer_training - INFO -   n_heads: 4
+2025-05-10 15:24:26,998 - transformer_training - INFO -   n_encoder_layers: 1
+2025-05-10 15:24:26,998 - transformer_training - INFO -   n_decoder_layers: 1
+2025-05-10 15:24:26,998 - transformer_training - INFO -   dropout: 0.3676035877895095
+2025-05-10 15:24:26,998 - transformer_training - INFO -   learning_rate: 0.0004994179354245752
+2025-05-10 15:24:26,998 - transformer_training - INFO -   batch_size: 64
+2025-05-10 15:24:26,998 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 15:24:26,998 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 15:24:26,998 - transformer_training - INFO - Creating datasets...
+2025-05-10 15:26:28,977 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 15:26:28,978 - transformer_training - INFO - Initializing model...
+2025-05-10 15:26:28,985 - transformer_training - INFO - Starting model training...
+2025-05-10 16:00:13,074 - transformer_training - INFO - Trial 6 completed. Best validation loss: 7940.5339
+2025-05-10 16:00:15,027 - transformer_training - INFO - ========== Trial 6 Complete ==========
+2025-05-10 16:00:15,027 - transformer_training - INFO - Progress: 7/30 trials completed
+
+2025-05-10 16:00:15,120 - transformer_training - INFO - 
+========== Starting Trial 7 ==========
+2025-05-10 16:00:15,120 - transformer_training - INFO - 
+Starting Trial 7
+2025-05-10 16:00:15,122 - transformer_training - INFO - Memory usage at start: 662.42 MB
+2025-05-10 16:00:15,122 - transformer_training - INFO - Using device: cpu
+2025-05-10 16:00:15,129 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 16:00:15,129 - transformer_training - INFO -   d_model: 8
+2025-05-10 16:00:15,129 - transformer_training - INFO -   n_heads: 2
+2025-05-10 16:00:15,129 - transformer_training - INFO -   n_encoder_layers: 3
+2025-05-10 16:00:15,129 - transformer_training - INFO -   n_decoder_layers: 2
+2025-05-10 16:00:15,129 - transformer_training - INFO -   dropout: 0.20116163678828355
+2025-05-10 16:00:15,129 - transformer_training - INFO -   learning_rate: 0.0009778383622590957
+2025-05-10 16:00:15,129 - transformer_training - INFO -   batch_size: 16
+2025-05-10 16:00:15,129 - transformer_training - INFO -   input_seq_len: 12
+2025-05-10 16:00:15,129 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 16:00:15,130 - transformer_training - INFO - Creating datasets...
+2025-05-10 16:02:24,122 - transformer_training - INFO - Created datasets with 188843 training sequences and 19110 validation sequences
+2025-05-10 16:02:24,127 - transformer_training - INFO - Initializing model...
+2025-05-10 16:02:24,152 - transformer_training - INFO - Starting model training...
+2025-05-10 16:36:20,821 - transformer_training - INFO - Trial 7 completed. Best validation loss: 5409.4097
+2025-05-10 16:36:22,607 - transformer_training - INFO - ========== Trial 7 Complete ==========
+2025-05-10 16:36:22,607 - transformer_training - INFO - Progress: 8/30 trials completed
+
+2025-05-10 16:36:22,692 - transformer_training - INFO - 
+========== Starting Trial 8 ==========
+2025-05-10 16:36:22,692 - transformer_training - INFO - 
+Starting Trial 8
+2025-05-10 16:36:22,693 - transformer_training - INFO - Memory usage at start: 662.33 MB
+2025-05-10 16:36:22,693 - transformer_training - INFO - Using device: cpu
+2025-05-10 16:36:22,701 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 16:36:22,701 - transformer_training - INFO -   d_model: 14
+2025-05-10 16:36:22,701 - transformer_training - INFO -   n_heads: 2
+2025-05-10 16:36:22,701 - transformer_training - INFO -   n_encoder_layers: 4
+2025-05-10 16:36:22,701 - transformer_training - INFO -   n_decoder_layers: 2
+2025-05-10 16:36:22,701 - transformer_training - INFO -   dropout: 0.3006390425575508
+2025-05-10 16:36:22,701 - transformer_training - INFO -   learning_rate: 0.002964915103229417
+2025-05-10 16:36:22,701 - transformer_training - INFO -   batch_size: 32
+2025-05-10 16:36:22,701 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 16:36:22,701 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 16:36:22,701 - transformer_training - INFO - Creating datasets...
+2025-05-10 16:38:25,373 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 16:38:25,377 - transformer_training - INFO - Initializing model...
+2025-05-10 16:38:25,389 - transformer_training - INFO - Starting model training...
+2025-05-10 17:04:59,757 - transformer_training - INFO - Trial 8 completed. Best validation loss: 6594.8926
+2025-05-10 17:05:01,565 - transformer_training - INFO - ========== Trial 8 Complete ==========
+2025-05-10 17:05:01,565 - transformer_training - INFO - Progress: 9/30 trials completed
+
+2025-05-10 17:05:01,628 - transformer_training - INFO - 
+========== Starting Trial 9 ==========
+2025-05-10 17:05:01,629 - transformer_training - INFO - 
+Starting Trial 9
+2025-05-10 17:05:01,630 - transformer_training - INFO - Memory usage at start: 667.56 MB
+2025-05-10 17:05:01,630 - transformer_training - INFO - Using device: cpu
+2025-05-10 17:05:01,637 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 17:05:01,637 - transformer_training - INFO -   d_model: 24
+2025-05-10 17:05:01,637 - transformer_training - INFO -   n_heads: 2
+2025-05-10 17:05:01,637 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 17:05:01,637 - transformer_training - INFO -   n_decoder_layers: 4
+2025-05-10 17:05:01,637 - transformer_training - INFO -   dropout: 0.1943095024759626
+2025-05-10 17:05:01,637 - transformer_training - INFO -   learning_rate: 0.006921688665748906
+2025-05-10 17:05:01,637 - transformer_training - INFO -   batch_size: 16
+2025-05-10 17:05:01,637 - transformer_training - INFO -   input_seq_len: 12
+2025-05-10 17:05:01,637 - transformer_training - INFO -   output_seq_len: 12
+2025-05-10 17:05:01,637 - transformer_training - INFO - Creating datasets...
+2025-05-10 17:06:17,125 - transformer_training - INFO - Created datasets with 188843 training sequences and 19110 validation sequences
+2025-05-10 17:06:17,129 - transformer_training - INFO - Initializing model...
+2025-05-10 17:06:17,149 - transformer_training - INFO - Starting model training...
+2025-05-10 17:17:18,239 - transformer_training - INFO - Trial 9 completed. Best validation loss: 8122.1772
+2025-05-10 17:17:19,648 - transformer_training - INFO - ========== Trial 9 Complete ==========
+2025-05-10 17:17:19,649 - transformer_training - INFO - Progress: 10/30 trials completed
+
+2025-05-10 17:17:19,711 - transformer_training - INFO - 
+========== Starting Trial 10 ==========
+2025-05-10 17:17:19,712 - transformer_training - INFO - 
+Starting Trial 10
+2025-05-10 17:17:19,712 - transformer_training - INFO - Memory usage at start: 659.72 MB
+2025-05-10 17:17:19,712 - transformer_training - INFO - Using device: cpu
+2025-05-10 17:17:19,733 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 17:17:19,733 - transformer_training - INFO -   d_model: 20
+2025-05-10 17:17:19,733 - transformer_training - INFO -   n_heads: 2
+2025-05-10 17:17:19,733 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 17:17:19,733 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 17:17:19,733 - transformer_training - INFO -   dropout: 0.10742748592738771
+2025-05-10 17:17:19,733 - transformer_training - INFO -   learning_rate: 0.0010513248403412705
+2025-05-10 17:17:19,733 - transformer_training - INFO -   batch_size: 16
+2025-05-10 17:17:19,733 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 17:17:19,733 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 17:17:19,733 - transformer_training - INFO - Creating datasets...
+2025-05-10 17:18:31,154 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 17:18:31,156 - transformer_training - INFO - Initializing model...
+2025-05-10 17:18:31,165 - transformer_training - INFO - Starting model training...
+2025-05-10 18:10:40,595 - transformer_training - INFO - Trial 10 completed. Best validation loss: 4396.9866
+2025-05-10 18:10:41,878 - transformer_training - INFO - ========== Trial 10 Complete ==========
+2025-05-10 18:10:41,878 - transformer_training - INFO - Progress: 11/30 trials completed
+
+2025-05-10 18:10:41,937 - transformer_training - INFO - 
+========== Starting Trial 11 ==========
+2025-05-10 18:10:41,938 - transformer_training - INFO - 
+Starting Trial 11
+2025-05-10 18:10:41,939 - transformer_training - INFO - Memory usage at start: 665.80 MB
+2025-05-10 18:10:41,939 - transformer_training - INFO - Using device: cpu
+2025-05-10 18:10:41,957 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 18:10:41,957 - transformer_training - INFO -   d_model: 20
+2025-05-10 18:10:41,957 - transformer_training - INFO -   n_heads: 2
+2025-05-10 18:10:41,957 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 18:10:41,957 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 18:10:41,957 - transformer_training - INFO -   dropout: 0.10858366817733975
+2025-05-10 18:10:41,957 - transformer_training - INFO -   learning_rate: 0.0010348592580945255
+2025-05-10 18:10:41,957 - transformer_training - INFO -   batch_size: 16
+2025-05-10 18:10:41,957 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 18:10:41,957 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 18:10:41,957 - transformer_training - INFO - Creating datasets...
+2025-05-10 18:11:50,204 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 18:11:50,208 - transformer_training - INFO - Initializing model...
+2025-05-10 18:11:50,214 - transformer_training - INFO - Starting model training...
+2025-05-10 19:06:32,645 - transformer_training - INFO - Trial 11 completed. Best validation loss: 4558.6012
+2025-05-10 19:06:34,875 - transformer_training - INFO - ========== Trial 11 Complete ==========
+2025-05-10 19:06:34,875 - transformer_training - INFO - Progress: 12/30 trials completed
+
+2025-05-10 19:06:34,997 - transformer_training - INFO - 
+========== Starting Trial 12 ==========
+2025-05-10 19:06:34,998 - transformer_training - INFO - 
+Starting Trial 12
+2025-05-10 19:06:34,999 - transformer_training - INFO - Memory usage at start: 597.56 MB
+2025-05-10 19:06:34,999 - transformer_training - INFO - Using device: cpu
+2025-05-10 19:06:35,030 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 19:06:35,030 - transformer_training - INFO -   d_model: 20
+2025-05-10 19:06:35,030 - transformer_training - INFO -   n_heads: 2
+2025-05-10 19:06:35,030 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 19:06:35,030 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 19:06:35,030 - transformer_training - INFO -   dropout: 0.12074480606382111
+2025-05-10 19:06:35,030 - transformer_training - INFO -   learning_rate: 0.0019062189309429116
+2025-05-10 19:06:35,030 - transformer_training - INFO -   batch_size: 16
+2025-05-10 19:06:35,030 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 19:06:35,030 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 19:06:35,030 - transformer_training - INFO - Creating datasets...
+2025-05-10 19:08:33,151 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 19:08:33,154 - transformer_training - INFO - Initializing model...
+2025-05-10 19:08:33,170 - transformer_training - INFO - Starting model training...
+2025-05-10 19:28:50,659 - transformer_training - INFO - Trial 12 completed. Best validation loss: 8886.2176
+2025-05-10 19:28:52,020 - transformer_training - INFO - ========== Trial 12 Complete ==========
+2025-05-10 19:28:52,020 - transformer_training - INFO - Progress: 13/30 trials completed
+
+2025-05-10 19:28:52,103 - transformer_training - INFO - 
+========== Starting Trial 13 ==========
+2025-05-10 19:28:52,104 - transformer_training - INFO - 
+Starting Trial 13
+2025-05-10 19:28:52,105 - transformer_training - INFO - Memory usage at start: 671.62 MB
+2025-05-10 19:28:52,105 - transformer_training - INFO - Using device: cpu
+2025-05-10 19:28:52,131 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 19:28:52,131 - transformer_training - INFO -   d_model: 20
+2025-05-10 19:28:52,131 - transformer_training - INFO -   n_heads: 2
+2025-05-10 19:28:52,131 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 19:28:52,131 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 19:28:52,131 - transformer_training - INFO -   dropout: 0.1105135669907522
+2025-05-10 19:28:52,131 - transformer_training - INFO -   learning_rate: 0.0007264763346095845
+2025-05-10 19:28:52,131 - transformer_training - INFO -   batch_size: 16
+2025-05-10 19:28:52,131 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 19:28:52,131 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 19:28:52,131 - transformer_training - INFO - Creating datasets...
+2025-05-10 19:30:49,976 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 19:30:49,979 - transformer_training - INFO - Initializing model...
+2025-05-10 19:30:49,988 - transformer_training - INFO - Starting model training...
+2025-05-10 20:57:12,946 - transformer_training - INFO - Trial 13 completed. Best validation loss: 5431.1571
+2025-05-10 20:57:14,803 - transformer_training - INFO - ========== Trial 13 Complete ==========
+2025-05-10 20:57:14,803 - transformer_training - INFO - Progress: 14/30 trials completed
+
+2025-05-10 20:57:14,877 - transformer_training - INFO - 
+========== Starting Trial 14 ==========
+2025-05-10 20:57:14,878 - transformer_training - INFO - 
+Starting Trial 14
+2025-05-10 20:57:14,879 - transformer_training - INFO - Memory usage at start: 670.22 MB
+2025-05-10 20:57:14,879 - transformer_training - INFO - Using device: cpu
+2025-05-10 20:57:14,902 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 20:57:14,902 - transformer_training - INFO -   d_model: 18
+2025-05-10 20:57:14,902 - transformer_training - INFO -   n_heads: 3
+2025-05-10 20:57:14,902 - transformer_training - INFO -   n_encoder_layers: 1
+2025-05-10 20:57:14,902 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 20:57:14,902 - transformer_training - INFO -   dropout: 0.264516113364837
+2025-05-10 20:57:14,902 - transformer_training - INFO -   learning_rate: 0.0033370191759989477
+2025-05-10 20:57:14,902 - transformer_training - INFO -   batch_size: 16
+2025-05-10 20:57:14,902 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 20:57:14,902 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 20:57:14,902 - transformer_training - INFO - Creating datasets...
+2025-05-10 20:59:12,169 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 20:59:12,172 - transformer_training - INFO - Initializing model...
+2025-05-10 20:59:12,180 - transformer_training - INFO - Starting model training...
+2025-05-10 21:37:18,694 - transformer_training - INFO - Trial 14 completed. Best validation loss: 8355.8267
+2025-05-10 21:37:20,599 - transformer_training - INFO - ========== Trial 14 Complete ==========
+2025-05-10 21:37:20,599 - transformer_training - INFO - Progress: 15/30 trials completed
+
+2025-05-10 21:37:20,677 - transformer_training - INFO - 
+========== Starting Trial 15 ==========
+2025-05-10 21:37:20,678 - transformer_training - INFO - 
+Starting Trial 15
+2025-05-10 21:37:20,679 - transformer_training - INFO - Memory usage at start: 667.64 MB
+2025-05-10 21:37:20,679 - transformer_training - INFO - Using device: cpu
+2025-05-10 21:37:20,704 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 21:37:20,704 - transformer_training - INFO -   d_model: 24
+2025-05-10 21:37:20,704 - transformer_training - INFO -   n_heads: 2
+2025-05-10 21:37:20,704 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 21:37:20,704 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 21:37:20,704 - transformer_training - INFO -   dropout: 0.22728348275851984
+2025-05-10 21:37:20,704 - transformer_training - INFO -   learning_rate: 0.00035044036906250027
+2025-05-10 21:37:20,704 - transformer_training - INFO -   batch_size: 16
+2025-05-10 21:37:20,704 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 21:37:20,705 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 21:37:20,705 - transformer_training - INFO - Creating datasets...
+2025-05-10 21:39:17,698 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 21:39:17,701 - transformer_training - INFO - Initializing model...
+2025-05-10 21:39:17,710 - transformer_training - INFO - Starting model training...
+2025-05-10 21:59:56,315 - transformer_training - INFO - Trial 15 completed. Best validation loss: 8407.8660
+2025-05-10 21:59:57,502 - transformer_training - INFO - ========== Trial 15 Complete ==========
+2025-05-10 21:59:57,502 - transformer_training - INFO - Progress: 16/30 trials completed
+
+2025-05-10 21:59:57,578 - transformer_training - INFO - 
+========== Starting Trial 16 ==========
+2025-05-10 21:59:57,579 - transformer_training - INFO - 
+Starting Trial 16
+2025-05-10 21:59:57,579 - transformer_training - INFO - Memory usage at start: 670.62 MB
+2025-05-10 21:59:57,580 - transformer_training - INFO - Using device: cpu
+2025-05-10 21:59:57,603 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 21:59:57,603 - transformer_training - INFO -   d_model: 18
+2025-05-10 21:59:57,603 - transformer_training - INFO -   n_heads: 3
+2025-05-10 21:59:57,603 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 21:59:57,603 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 21:59:57,603 - transformer_training - INFO -   dropout: 0.10198148436506521
+2025-05-10 21:59:57,603 - transformer_training - INFO -   learning_rate: 0.0013205635246041003
+2025-05-10 21:59:57,603 - transformer_training - INFO -   batch_size: 32
+2025-05-10 21:59:57,603 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 21:59:57,603 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 21:59:57,603 - transformer_training - INFO - Creating datasets...
+2025-05-10 22:01:53,896 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 22:01:53,898 - transformer_training - INFO - Initializing model...
+2025-05-10 22:01:53,908 - transformer_training - INFO - Starting model training...
+2025-05-10 22:57:51,159 - transformer_training - INFO - Trial 16 completed. Best validation loss: 7560.7071
+2025-05-10 22:57:52,490 - transformer_training - INFO - ========== Trial 16 Complete ==========
+2025-05-10 22:57:52,490 - transformer_training - INFO - Progress: 17/30 trials completed
+
+2025-05-10 22:57:52,549 - transformer_training - INFO - 
+========== Starting Trial 17 ==========
+2025-05-10 22:57:52,550 - transformer_training - INFO - 
+Starting Trial 17
+2025-05-10 22:57:52,551 - transformer_training - INFO - Memory usage at start: 672.61 MB
+2025-05-10 22:57:52,551 - transformer_training - INFO - Using device: cpu
+2025-05-10 22:57:52,567 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 22:57:52,567 - transformer_training - INFO -   d_model: 22
+2025-05-10 22:57:52,567 - transformer_training - INFO -   n_heads: 2
+2025-05-10 22:57:52,567 - transformer_training - INFO -   n_encoder_layers: 1
+2025-05-10 22:57:52,567 - transformer_training - INFO -   n_decoder_layers: 2
+2025-05-10 22:57:52,567 - transformer_training - INFO -   dropout: 0.35450423777287743
+2025-05-10 22:57:52,567 - transformer_training - INFO -   learning_rate: 0.0033532290552530804
+2025-05-10 22:57:52,567 - transformer_training - INFO -   batch_size: 16
+2025-05-10 22:57:52,567 - transformer_training - INFO -   input_seq_len: 24
+2025-05-10 22:57:52,567 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 22:57:52,567 - transformer_training - INFO - Creating datasets...
+2025-05-10 22:59:01,518 - transformer_training - INFO - Created datasets with 183169 training sequences and 14322 validation sequences
+2025-05-10 22:59:01,524 - transformer_training - INFO - Initializing model...
+2025-05-10 22:59:01,533 - transformer_training - INFO - Starting model training...
+2025-05-10 23:13:06,937 - transformer_training - INFO - Trial 17 completed. Best validation loss: 8482.3999
+2025-05-10 23:13:08,200 - transformer_training - INFO - ========== Trial 17 Complete ==========
+2025-05-10 23:13:08,201 - transformer_training - INFO - Progress: 18/30 trials completed
+
+2025-05-10 23:13:08,260 - transformer_training - INFO - 
+========== Starting Trial 18 ==========
+2025-05-10 23:13:08,261 - transformer_training - INFO - 
+Starting Trial 18
+2025-05-10 23:13:08,262 - transformer_training - INFO - Memory usage at start: 678.36 MB
+2025-05-10 23:13:08,262 - transformer_training - INFO - Using device: cpu
+2025-05-10 23:13:08,280 - transformer_training - INFO - Selected hyperparameters for this trial:
+2025-05-10 23:13:08,280 - transformer_training - INFO -   d_model: 15
+2025-05-10 23:13:08,280 - transformer_training - INFO -   n_heads: 3
+2025-05-10 23:13:08,281 - transformer_training - INFO -   n_encoder_layers: 2
+2025-05-10 23:13:08,281 - transformer_training - INFO -   n_decoder_layers: 3
+2025-05-10 23:13:08,281 - transformer_training - INFO -   dropout: 0.3962994334932317
+2025-05-10 23:13:08,281 - transformer_training - INFO -   learning_rate: 0.0008029815055648833
+2025-05-10 23:13:08,281 - transformer_training - INFO -   batch_size: 16
+2025-05-10 23:13:08,281 - transformer_training - INFO -   input_seq_len: 48
+2025-05-10 23:13:08,281 - transformer_training - INFO -   output_seq_len: 24
+2025-05-10 23:13:08,281 - transformer_training - INFO - Creating datasets...
+2025-05-10 23:14:15,647 - transformer_training - INFO - Created datasets with 177682 training sequences and 10522 validation sequences
+2025-05-10 23:14:15,651 - transformer_training - INFO - Initializing model...
+2025-05-10 23:14:15,658 - transformer_training - INFO - Starting model training...

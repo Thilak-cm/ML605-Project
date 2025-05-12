@@ -1,0 +1,7 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - echo "Updating ECS Service..."
+      - aws ecs update-service --cluster my-app-cluster --service backend-service --force-new-deployment
+      - echo "ECS service update completed!"

@@ -211,8 +211,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Add timeout for live features fetch
                     liveFeaturesTimeoutId = setTimeout(() => {
                         liveFeaturesController.abort();
-                        console.log("Live features request timed out after 5 seconds");
-                    }, 5000); // 5 second timeout
+                        console.log("Live features request timed out after 60 seconds");
+                    }, 60000); // 60 seconds timeout
 
                     const response = await fetch(liveFeaturesUrl, { signal: liveFeaturesController.signal });
 
@@ -250,8 +250,8 @@ document.addEventListener('DOMContentLoaded', function() {
             controller = new AbortController();
             timeoutId = setTimeout(() => {
                 controller.abort();
-                console.log("Request timed out after 10 seconds");
-            }, 10000); // 10 second timeout
+                console.log("Request timed out after 60 seconds");
+            }, 60000); // 60 seconds timeout
             
             try {
                 const predictionResponse = await fetch('/predict', {
